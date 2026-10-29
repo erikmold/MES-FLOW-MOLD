@@ -1,0 +1,2257 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MORIROKU + 3D Moldflow CAE Pro (Valve Gate Edition)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+        :root { --jsw-green: #00ff9d; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #05070b; color: #dbe4f0; margin: 0; overflow: hidden; user-select: none; }
+        .font-mono-tech { font-family: 'JetBrains Mono', monospace; }
+        .font-hmi { font-family: 'Chakra Petch', sans-serif; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #070a10; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        .syscom-tab { border-bottom: 2px solid transparent; transition: 0.2s; }
+        .syscom-tab.active { background: linear-gradient(180deg, rgba(0,255,157,0.14) 0%, transparent 100%); border-bottom: 2px solid var(--jsw-green); color: var(--jsw-green); }
+        .matrix-table { width: 100%; border-collapse: separate; border-spacing: 1px; }
+        .matrix-table th { background: #0f1624; color: #7c8ea6; font-size: 9px; padding: 5px 3px; text-transform: uppercase; font-weight: 700; }
+        .matrix-table td { background: #141d2f; padding: 2px; border: 1px solid #1c2840; }
+        .matrix-table input, .matrix-table select { width: 100%; background: transparent; border: none; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; outline: none; padding: 3px 0; color: #fff; }
+        .matrix-table input:focus { background: rgba(0,255,157,0.1); color: var(--jsw-green); }
+        .jsw-field { background: #080c14; border: 1px solid #1e293b; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; border-radius: 6px; outline: none; }
+        .jsw-field:focus { border-color: var(--jsw-green); }
+        .glow-btn-green { background: linear-gradient(135deg, #00ff9d 0%, #00b871 100%); color: #03150d; box-shadow: 0 0 15px rgba(0,255,157,0.3); }
+        .cae-pin { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 40; padding-bottom: 20px; }
+        .cae-pin::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 2px; height: 20px; background: currentColor; transform: translateX(-50%); }
+        .cae-pin-dot { position: absolute; bottom: -4px; left: 50%; width: 8px; height: 8px; border-radius: 50%; background: currentColor; transform: translateX(-50%); border: 2px solid #fff; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-[#05070b]">
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] opacity-0 pointer-events-none transition-all duration-300 bg-[#0c1322]/95 border border-[#1e2f47] text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2.5">
+        <i id="toastIcon" class="fas fa-microchip text-emerald-400"></i>
+        <span id="toastMsg" class="text-xs font-semibold">Ready</span>
+    </div>
+
+    <!-- SETUP SHEET MODAL (IATF-16949) -->
+    <div id="setupSheetModal" class="fixed inset-0 z-[9000] bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-[#0c121e] border border-[#1e2d4a] rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-5 py-3 bg-[#080d16] border-b border-[#182338] flex items-center justify-between">
+                <h3 class="font-hmi font-bold text-sm text-white uppercase"><i class="fas fa-file-invoice text-emerald-400 mr-2"></i>MORIROKU Scientific Molding & Valve Gate Setup Sheet (IATF-16949)</h3>
+                <button onclick="toggleSetupSheetModal(false)" class="w-7 h-7 rounded bg-[#141e30] text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="setupSheetContent" class="p-4 overflow-y-auto space-y-3 text-xs font-mono-tech"></div>
+            <div class="px-5 py-3 bg-[#080d16] border-t border-[#182338] flex justify-end gap-2">
+                <button onclick="downloadRecipeJSON()" class="px-3 py-1.5 rounded-lg bg-[#162238] text-cyan-400 border border-cyan-500/30 text-xs font-bold"><i class="fas fa-download mr-1"></i>Export JSON</button>
+                <button onclick="window.print()" class="px-4 py-1.5 rounded-lg glow-btn-green text-xs font-bold"><i class="fas fa-print mr-1"></i>Print</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CAE CONTOUR & SPECTRUM GUIDE MODAL -->
+    <div id="caeGuideModal" class="fixed inset-0 z-[9200] bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="bg-[#0b111e] border border-cyan-500/40 rounded-2xl max-w-5xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-5 py-3.5 bg-[#070b14] border-b border-[#18263e] flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400"><i class="fas fa-swatchbook"></i></div>
+                    <div>
+                        <h3 class="font-hmi font-bold text-sm text-white uppercase tracking-wide">Panduan Analisis 6 Diagram Kontur 3D CAE & Spektrum Warna</h3>
+                        <p class="text-[10px] text-slate-400 font-mono-tech">MORIROKU Scientific Molding & Sequential Valve Gate (SVG) Rheology Interpretation Guide</p>
+                    </div>
+                </div>
+                <button onclick="toggleCAEGuideModal(false)" class="w-8 h-8 rounded-lg bg-[#141e30] text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="caeGuideModalContent" class="p-4 overflow-y-auto space-y-4 text-xs"></div>
+            <div class="px-5 py-3 bg-[#070b14] border-t border-[#18263e] flex items-center justify-between">
+                <span class="text-[10px] font-mono-tech text-slate-400"><i class="fas fa-lightbulb text-amber-400 mr-1.5"></i>Klik salah satu kartu mode di atas untuk langsung mengaktifkan kontur tersebut pada model 3D.</span>
+                <button onclick="toggleCAEGuideModal(false)" class="px-4 py-1.5 rounded-lg glow-btn-green text-xs font-bold">MENGERTI & TUTUP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="h-14 bg-[#080c14] border-b border-[#152033] px-4 flex items-center justify-between shrink-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00ff9d] to-emerald-700 flex items-center justify-center font-black text-black font-hmi text-lg">M</div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-hmi text-sm font-bold tracking-wider text-white">MORIROKU</h1>
+                    <span class="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[#00ff9d] font-mono-tech">SVG + 3D GATE V3.0</span>
+                </div>
+                <p class="text-[8px] text-slate-400 font-mono-tech uppercase">Sequential Valve Gate & Wall-Proportional 3D Rheology Twin</p>
+            </div>
+
+            <div class="hidden xl:flex items-center gap-3 px-3 py-1 rounded-xl bg-[#0c121e] border border-[#172338] ml-2">
+                <div><span class="text-[7.5px] text-slate-500 block uppercase font-bold">Melt / Res.</span><span id="headerMeltStatus" class="text-[10.5px] font-mono-tech font-bold text-emerald-400">225°C (2.1m)</span></div>
+                <div class="h-5 w-px bg-[#1b2840]"></div>
+                <div><span class="text-[7.5px] text-slate-500 block uppercase font-bold">Clamp Force</span><span id="headerClampStatus" class="text-[10.5px] font-mono-tech font-bold text-white">128T / 180T</span></div>
+                <div class="h-5 w-px bg-[#1b2840]"></div>
+                <div><span class="text-[7.5px] text-slate-500 block uppercase font-bold">Gate Geometry</span><span id="headerGateGeometry" class="text-[10.5px] font-mono-tech font-bold text-amber-400">VG Ø1.87mm</span></div>
+                <div class="h-5 w-px bg-[#1b2840]"></div>
+                <div><span class="text-[7.5px] text-slate-500 block uppercase font-bold">Gate Shear</span><span id="headerGateShear" class="text-[10.5px] font-mono-tech font-bold text-cyan-400">14,200 s⁻¹</span></div>
+                <div class="h-5 w-px bg-[#1b2840]"></div>
+                <div><span class="text-[7.5px] text-slate-500 block uppercase font-bold">Shot Weight</span><span id="headerShotWeight" class="text-[10.5px] font-mono-tech font-bold text-purple-400">42.6g (48%)</span></div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <div class="flex bg-[#060910] p-1 rounded-lg border border-[#182338]">
+                <button onclick="setLayoutMode('split')" id="btnViewSplit" class="px-2 py-1 rounded text-[10px] font-bold bg-[#182338] text-white">SPLIT</button>
+                <button onclick="setLayoutMode('param')" id="btnViewParam" class="px-2 py-1 rounded text-[10px] font-bold text-slate-400">HMI</button>
+                <button onclick="setLayoutMode('cae')" id="btnViewCAE" class="px-2 py-1 rounded text-[10px] font-bold text-slate-400">3D CAE</button>
+            </div>
+            <button onclick="toggleSetupSheetModal(true)" class="bg-[#101829] hover:bg-[#19253f] text-cyan-300 border border-cyan-500/30 font-bold px-2.5 py-1.5 rounded-lg text-[10.5px]"><i class="fas fa-clipboard-list mr-1"></i>SHEET</button>
+            <button onclick="runSmartAutoTune()" class="bg-[#101c29] hover:bg-[#16293d] text-[#00ff9d] border border-emerald-500/40 font-bold px-2.5 py-1.5 rounded-lg text-[10.5px]"><i class="fas fa-wand-magic-sparkles mr-1"></i>AI TUNE</button>
+            <button onclick="executeMoldingSimulation(true)" class="glow-btn-green font-hmi font-bold py-1.5 px-3 rounded-lg text-[11px] uppercase"><i class="fas fa-bolt mr-1"></i>SIMULATE</button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT PANE: JSW SYSCOM HMI -->
+        <div id="paramPane" class="w-full lg:w-1/2 flex flex-col bg-[#070a11] border-r border-[#141d2e] z-20">
+            <div class="flex bg-[#0a0f1a] border-b border-[#162033] shrink-0 overflow-x-auto">
+                <button onclick="switchHMITab('tab-mat', this)" class="syscom-tab active px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap">1. MAT & MOLD</button>
+                <button onclick="switchHMITab('tab-svg', this)" id="tabBtnSVG" class="syscom-tab px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap text-amber-400"><i class="fas fa-faucet-drip mr-1"></i>2. VALVE GATE (SVG)</button>
+                <button onclick="switchHMITab('tab-barrel', this)" class="syscom-tab px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap text-slate-400">3. TEMP & MTC</button>
+                <button onclick="switchHMITab('tab-vp', this)" class="syscom-tab px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap text-slate-400">4. INJECT (V-P)</button>
+                <button onclick="switchHMITab('tab-screw', this)" class="syscom-tab px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap text-slate-400">5. DOSING & COOL</button>
+                <button onclick="switchHMITab('tab-scientific', this)" class="syscom-tab px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap text-slate-400">6. SCIENTIFIC</button>
+                <button onclick="switchHMITab('tab-mes', this)" class="syscom-tab px-2.5 py-2.5 text-[9.5px] font-bold font-hmi uppercase whitespace-nowrap text-slate-400">7. MES & COST</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3" oninput="handleRealtimeParamChange()">
+                <!-- TAB 1: MATERIAL, MACHINE & WALL-LINKED GATE SIZING -->
+                <div id="tab-mat" class="hmi-tab-body space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                            <div class="flex justify-between items-center mb-2 border-b border-[#19263d] pb-1">
+                                <span class="text-[10.5px] font-bold font-hmi uppercase text-emerald-400">Polymer Resin DB</span>
+                                <span id="badgeMorphology" class="text-[8.5px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-mono-tech">SEMI-CRYSTALLINE</span>
+                            </div>
+                            <select id="selMaterial" onchange="applyResinProperties()" class="jsw-field w-full p-1.5 mb-2 bg-[#11192b]">
+                                <option value="PP">PP (Polypropylene Homo)</option>
+                                <option value="ABS">ABS (High Impact Toyolac)</option>
+                                <option value="PC">PC (Optical Makrolon)</option>
+                                <option value="PA66">PA66-GF30 (Glass Filled)</option>
+                                <option value="POM">POM (Polyacetal Duracon)</option>
+                                <option value="PBT">PBT (Connector Grade)</option>
+                                <option value="PMMA">PMMA (Optical Acrylic)</option>
+                                <option value="PEEK">PEEK (Aerospace Grade)</option>
+                            </select>
+                            <div class="grid grid-cols-2 gap-1 text-[10px] font-mono-tech">
+                                <div class="p-1.5 rounded bg-[#080c14] flex justify-between"><span class="text-slate-500">MFI/ρ:</span><span id="txtResinMFI" class="text-emerald-400">12g/0.75</span></div>
+                                <div class="p-1.5 rounded bg-[#080c14] flex justify-between"><span class="text-slate-500">Alpha:</span><span id="txtResinAlpha" class="text-cyan-400">0.088</span></div>
+                                <div class="p-1.5 rounded bg-[#080c14] flex justify-between"><span class="text-slate-500">Shear:</span><span id="txtResinShearLimit" class="text-rose-400">60,000</span></div>
+                                <div class="p-1.5 rounded bg-[#080c14] flex justify-between"><span class="text-slate-500">Shrink:</span><span id="txtResinShrink" class="text-amber-400">1.4-1.8%</span></div>
+                                <div class="p-1.5 rounded bg-[#080c14] flex justify-between col-span-2"><span class="text-slate-500">Drying:</span><span id="txtResinDrying" class="text-slate-200">No Drying Req</span></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                            <div class="flex justify-between items-center mb-2 border-b border-[#19263d] pb-1">
+                                <span class="text-[10.5px] font-bold font-hmi uppercase text-cyan-400">Machine & Cavity Data</span>
+                                <span id="txtScrewDiaBadge" class="text-[8.5px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-mono-tech">Screw Ø40mm</span>
+                            </div>
+                            <select id="selMachine" onchange="handleRealtimeParamChange()" class="jsw-field w-full p-1.5 mb-2 bg-[#11192b]">
+                                <option value="110">JSW J110AD (110T / Ø36mm)</option>
+                                <option value="180" selected>JSW J180AD (180T / Ø40mm)</option>
+                                <option value="280">JSW J280AD (280T / Ø50mm)</option>
+                                <option value="350">JSW J350AD (350T / Ø58mm)</option>
+                                <option value="550">JSW J550AD (550T / Ø68mm)</option>
+                                <option value="850">JSW J850AD (850T / Ø84mm)</option>
+                                <option value="1300">JSW J1300AD (1300T / Ø100mm)</option>
+                            </select>
+                            <div class="grid grid-cols-3 gap-1.5 mb-1.5">
+                                <div><label class="text-[8px] text-slate-400 block">Area/Cav(cm²)</label><input type="number" id="inpProjArea" value="145" class="jsw-field w-full p-1 text-center text-amber-400"></div>
+                                <div><label class="text-[8px] text-slate-400 block">Cavities</label><input type="number" id="inpCavities" value="2" min="1" class="jsw-field w-full p-1 text-center text-emerald-400"></div>
+                                <div>
+                                    <label class="text-[8px] text-[#00ff9d] font-bold block">Wall t (mm)</label>
+                                    <input type="number" id="inpWallThick" value="2.2" min="0.5" max="10.0" step="0.1" oninput="onWallThicknessChanged()" class="jsw-field w-full p-1 text-center text-[#00ff9d] border-emerald-500/50">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <div><label class="text-[8px] text-slate-400 block">Flow Len L (mm)</label><input type="number" id="inpFlowLength" value="160" class="jsw-field w-full p-1 text-center text-white"></div>
+                                <div>
+                                    <label class="text-[8px] text-slate-400 block">Runner System</label>
+                                    <select id="selRunnerType" onchange="onRunnerSystemChanged()" class="jsw-field w-full p-1 bg-[#11192b] text-amber-300">
+                                        <option value="valve" selected>Hot Runner + Valve Gate</option>
+                                        <option value="hot">Hot Runner (Open Tip)</option>
+                                        <option value="cold">Cold Runner System</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PROPORTIONAL GATE GEOMETRY LINKED TO WALL THICKNESS -->
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-cyan-500/30">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2 border-b border-[#19263d] pb-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10.5px] font-bold font-hmi uppercase text-cyan-400"><i class="fas fa-ruler-combined mr-1"></i>Gate Geometry Linked to Wall Thickness (t)</span>
+                                <span id="badgeGateRule" class="text-[8.5px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono-tech">Rule: Ø = 0.85 × t</span>
+                            </div>
+                            <label class="flex items-center gap-1.5 cursor-pointer text-[9.5px] font-mono-tech text-emerald-400">
+                                <input type="checkbox" id="chkAutoGateWall" checked onchange="onWallThicknessChanged()" class="accent-emerald-400 rounded">
+                                Auto-Sync with Wall (t)
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-5 gap-2 text-center font-mono-tech">
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">ORIFICE Ø (mm)</span>
+                                <input type="number" id="inpGateDiaHmi" value="1.87" step="0.05" min="0.4" max="8.0" oninput="onManualGateGeometryEdit('dia')" class="bg-transparent w-full text-center text-xs font-bold text-cyan-300 outline-none">
+                            </div>
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">GATE WIDTH W (mm)</span>
+                                <input type="number" id="inpGateWidthHmi" value="1.87" step="0.1" min="0.5" max="20.0" oninput="onManualGateGeometryEdit('w')" class="bg-transparent w-full text-center text-xs font-bold text-amber-300 outline-none">
+                            </div>
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">DEPTH / THICK H (mm)</span>
+                                <input type="number" id="inpGateThickHmi" value="1.87" step="0.05" min="0.3" max="8.0" oninput="onManualGateGeometryEdit('h')" class="bg-transparent w-full text-center text-xs font-bold text-emerald-400 outline-none">
+                            </div>
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">LAND LENGTH L (mm)</span>
+                                <input type="number" id="inpGateLandHmi" value="1.10" step="0.1" min="0.4" max="6.0" oninput="onManualGateGeometryEdit('l')" class="bg-transparent w-full text-center text-xs font-bold text-white outline-none">
+                            </div>
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">FLOW AREA (mm²)</span>
+                                <span id="txtGateFlowArea" class="text-xs font-bold text-purple-400">2.75 mm²</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: SEQUENTIAL VALVE GATE (SVG) CONTROLLER -->
+                <div id="tab-svg" class="hmi-tab-body hidden space-y-2.5">
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-amber-500/30">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5 border-b border-[#19263d] pb-2">
+                            <div>
+                                <h3 class="text-[11px] font-bold font-hmi uppercase text-amber-400"><i class="fas fa-sliders mr-1.5"></i>Sequential Valve Gate (SVG) Controller</h3>
+                                <p class="text-[8.5px] text-slate-400 font-mono-tech">Timer Open/Close mekanis mengatur profil aliran polimer & eliminasi Weld Line pada multi-gate</p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <select id="selSVGActuationMode" onchange="onSVGModeChange()" class="jsw-field px-2 py-1 text-[10px] bg-[#131e33] text-amber-300 border-amber-500/40">
+                                    <option value="cascade" selected>Sequential Cascade (Anti-Weld Line)</option>
+                                    <option value="simultaneous">Simultaneous Open (Standard SVG)</option>
+                                    <option value="custom">Custom Manual Timer</option>
+                                </select>
+                                <button onclick="setupCascade3GatesPreset()" class="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 font-mono-tech text-[9.5px] font-bold"><i class="fas fa-sitemap mr-1"></i>3-GATE CASCADE</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 mb-2.5 text-center font-mono-tech">
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">ACTUATOR DRIVE</span>
+                                <select id="selValveDrive" onchange="handleRealtimeParamChange()" class="bg-transparent text-cyan-300 font-bold text-[10px] w-full text-center outline-none">
+                                    <option value="hydraulic">Hydraulic Cylinder (140 bar)</option>
+                                    <option value="pneumatic">Pneumatic (8 bar)</option>
+                                    <option value="servo">E-Drive Servo Pin</option>
+                                </select>
+                            </div>
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">VALVE PIN STROKE / VEL</span>
+                                <span id="txtPinStrokeSpec" class="text-[10.5px] font-bold text-emerald-400">8.0 mm / 120 mm/s</span>
+                            </div>
+                            <div class="p-1.5 rounded bg-[#080c14] border border-[#162238]">
+                                <span class="text-[7.5px] text-slate-400 block">WELD LINE STATUS</span>
+                                <span id="txtWeldLineElimination" class="text-[10.5px] font-bold text-emerald-400">SINGLE GATE (NO WELD)</span>
+                            </div>
+                        </div>
+
+                        <!-- VALVE GATE MATRIX TABLE -->
+                        <div class="overflow-x-auto">
+                            <table class="matrix-table">
+                                <thead>
+                                    <tr>
+                                        <th>GATE ID</th>
+                                        <th>TRIGGER</th>
+                                        <th>T_OPEN (s)</th>
+                                        <th>SCREW OPEN (mm)</th>
+                                        <th>T_CLOSE (s)</th>
+                                        <th>PIN Ø × H (mm)</th>
+                                        <th>LIVE STATE</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="svgMatrixBody">
+                                    <!-- Dynamically populated per 3D gate -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-2.5 flex items-center justify-between text-[9px] font-mono-tech text-slate-400 bg-[#080c14] px-2.5 py-1.5 rounded-lg border border-[#152036]">
+                            <span><i class="fas fa-circle-info text-cyan-400 mr-1"></i>Double-click pada model 3D untuk menambah titik Valve Gate baru.</span>
+                            <button onclick="autoCalcCascadeTimers()" class="text-emerald-400 hover:underline font-bold"><i class="fas fa-bolt mr-1"></i>Auto-Calculate Cascade Delay</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: BARREL & MTC -->
+                <div id="tab-barrel" class="hmi-tab-body hidden space-y-2.5">
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                        <h3 class="text-[10.5px] font-bold font-hmi uppercase text-amber-400 mb-2">Barrel Heater Zones (°C)</h3>
+                        <table class="matrix-table">
+                            <thead><tr><th>Manifold</th><th>Nozzle</th><th>Zone H1</th><th>Zone H2</th><th>Zone H3</th><th>Zone H4</th><th>Feed H5</th></tr></thead>
+                            <tbody><tr>
+                                <td><input type="number" id="tempManifold" value="230"></td>
+                                <td><input type="number" id="tempNH" value="225"></td>
+                                <td><input type="number" id="tempH1" value="225"></td>
+                                <td><input type="number" id="tempH2" value="215"></td>
+                                <td><input type="number" id="tempH3" value="205"></td>
+                                <td><input type="number" id="tempH4" value="190"></td>
+                                <td><input type="number" id="tempH5" value="60"></td>
+                            </tr></tbody>
+                        </table>
+                    </div>
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10.5px] font-bold font-hmi uppercase text-cyan-400">Mold MTC & Turbulent Cooling</span>
+                            <span id="badgeReynolds" class="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono-tech font-bold">Re: 5,420 (TURBULENT)</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div><label class="text-[8.5px] text-slate-400 block">Fixed Cavity (°C)</label><input type="number" id="tempMoldFix" value="45" class="jsw-field w-full p-1.5 text-center text-cyan-300"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">Moving Core (°C)</label><input type="number" id="tempMoldMov" value="45" class="jsw-field w-full p-1.5 text-center text-cyan-300"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">MTC Flow (L/min)</label><input type="number" id="inpCoolantFlow" value="6.5" step="0.5" class="jsw-field w-full p-1.5 text-center text-emerald-400"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: INJECT V-P -->
+                <div id="tab-vp" class="hmi-tab-body hidden space-y-2.5">
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10.5px] font-bold font-hmi uppercase text-emerald-400">5-Step Injection Velocity</span>
+                            <div class="flex items-center gap-1.5"><span class="text-[9px] font-mono-tech text-amber-400">V-P Pos (mm):</span><input type="number" id="inpVPSwitch" value="10" class="jsw-field w-12 p-0.5 text-center text-amber-400"></div>
+                        </div>
+                        <table class="matrix-table mb-2.5">
+                            <thead><tr><th>STEP</th><th>V1</th><th>V2</th><th>V3</th><th>V4</th><th>V5</th></tr></thead>
+                            <tbody>
+                                <tr><td class="text-[9px] font-mono-tech text-slate-400">Vel (%)</td><td><input type="number" id="v_1" value="35"></td><td><input type="number" id="v_2" value="65"></td><td><input type="number" id="v_3" value="80"></td><td><input type="number" id="v_4" value="55"></td><td><input type="number" id="v_5" value="25"></td></tr>
+                                <tr><td class="text-[9px] font-mono-tech text-slate-400">Lim (MPa)</td><td><input type="number" id="p_1" value="135"></td><td><input type="number" id="p_2" value="155"></td><td><input type="number" id="p_3" value="175"></td><td><input type="number" id="p_4" value="155"></td><td><input type="number" id="p_5" value="130"></td></tr>
+                                <tr><td class="text-[9px] font-mono-tech text-slate-400">Pos (mm)</td><td><input type="number" id="x_1" value="54"></td><td><input type="number" id="x_2" value="44"></td><td><input type="number" id="x_3" value="28"></td><td><input type="number" id="x_4" value="16"></td><td><input type="number" id="x_5" value="10" disabled></td></tr>
+                            </tbody>
+                        </table>
+                        <span class="text-[10.5px] font-bold font-hmi uppercase text-amber-400 block mb-1">3-Step Holding Pressure</span>
+                        <table class="matrix-table">
+                            <thead><tr><th>STEP</th><th>HP 1 (Pack)</th><th>HP 2 (Hold)</th><th>HP 3 (Stress)</th></tr></thead>
+                            <tbody>
+                                <tr><td class="text-[9px] font-mono-tech text-slate-400">Press (MPa)</td><td><input type="number" id="hp_1" value="68"></td><td><input type="number" id="hp_2" value="52"></td><td><input type="number" id="hp_3" value="35"></td></tr>
+                                <tr><td class="text-[9px] font-mono-tech text-slate-400">Time (s)</td><td><input type="number" id="ht_1" value="2.0" step="0.2"></td><td><input type="number" id="ht_2" value="2.2" step="0.2"></td><td><input type="number" id="ht_3" value="1.0" step="0.2"></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB 5: DOSING & COOLING -->
+                <div id="tab-screw" class="hmi-tab-body hidden">
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10.5px] font-bold font-hmi uppercase text-cyan-400">Dosing & Cooling Timers</span>
+                            <span id="txtReqShotHint" class="text-[9.5px] font-mono-tech text-cyan-400 font-bold">Ideal Shot: 62.0 mm</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-2">
+                            <div><label class="text-[8.5px] text-slate-400 block">Screw RPM</label><input type="number" id="inpRPM" value="85" class="jsw-field w-full p-1.5 text-center text-emerald-400"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">Back Press (MPa)</label><input type="number" id="inpBP" value="8.5" step="0.5" class="jsw-field w-full p-1.5 text-center text-amber-400"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">Shot Size (mm)</label><input type="number" id="inpShotSize" value="62" class="jsw-field w-full p-1.5 text-center text-cyan-400"></div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2">
+                            <div><label class="text-[8.5px] text-slate-400 block">Cooling (s)</label><input type="number" id="inpCoolTime" value="12.5" step="0.5" class="jsw-field w-full p-1.5 text-center text-cyan-300"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">Cushion (mm)</label><input type="number" id="inpCushion" value="4.5" step="0.5" class="jsw-field w-full p-1.5 text-center text-rose-400"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">Suck-Back (mm)</label><input type="number" id="inpSuckBack" value="3.0" step="0.5" class="jsw-field w-full p-1.5 text-center text-purple-400"></div>
+                            <div><label class="text-[8.5px] text-slate-400 block">Dry Cycle (s)</label><input type="number" id="inpDryCycle" value="2.4" step="0.2" class="jsw-field w-full p-1.5 text-center text-slate-300"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 6: SCIENTIFIC (RJG) -->
+                <div id="tab-scientific" class="hmi-tab-body hidden">
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a] grid grid-cols-3 gap-2 font-mono-tech">
+                        <div class="p-2 rounded bg-[#080c14] border border-[#162238]"><span class="text-[8px] text-slate-500 block">FLOW RATIO (L/t)</span><span id="sciLtRatio" class="text-xs font-bold text-white">72.7 : 1</span><span id="sciLtStatus" class="text-[8px] text-emerald-400 block">Safe (&lt;150)</span></div>
+                        <div class="p-2 rounded bg-[#080c14] border border-[#162238]"><span class="text-[8px] text-slate-500 block">BARREL UTIL %</span><span id="sciBarrelUtil" class="text-xs font-bold text-emerald-400">48.5 %</span><span class="text-[8px] text-slate-400 block">Window: 25-65%</span></div>
+                        <div class="p-2 rounded bg-[#080c14] border border-[#162238]"><span class="text-[8px] text-slate-500 block">RESIDENCE TIME</span><span id="sciResidenceTime" class="text-xs font-bold text-cyan-400">2.1 min</span><span class="text-[8px] text-slate-400 block">Max: 5.0 min</span></div>
+                        <div class="p-2 rounded bg-[#080c14] border border-[#162238]"><span class="text-[8px] text-slate-500 block">THEO. MIN COOL</span><span id="sciMinCool" class="text-xs font-bold text-amber-400">10.8 s</span><span class="text-[8px] text-slate-400 block">Ballman Eq</span></div>
+                        <div class="p-2 rounded bg-[#080c14] border border-[#162238]"><span class="text-[8px] text-slate-500 block">EFF. VISCOSITY</span><span id="sciEffVisc" class="text-xs font-bold text-purple-400">192 Pa·s</span><span class="text-[8px] text-slate-400 block">Cross-WLF</span></div>
+                        <div class="p-2 rounded bg-[#080c14] border border-[#162238]"><span class="text-[8px] text-slate-500 block">SINK MARK IDX</span><span id="sciSinkIndex" class="text-xs font-bold text-emerald-400">1.15 %</span><span class="text-[8px] text-slate-400 block">Target &lt; 2.0%</span></div>
+                    </div>
+                </div>
+
+                <!-- TAB 7: MES & COST -->
+                <div id="tab-mes" class="hmi-tab-body hidden">
+                    <div class="bg-[#0d1320] p-3 rounded-xl border border-[#18243a]">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-[10.5px] font-bold font-hmi uppercase text-amber-400">MES Production & Costing</span>
+                            <span id="mesHourlyOutput" class="text-[9.5px] font-mono-tech text-emerald-400 font-bold">375 pcs/hr</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-2">
+                            <div><label class="text-[8px] text-slate-400 block">Batch Order (pcs)</label><input type="number" id="inpBatchQty" value="10000" class="jsw-field w-full p-1 text-center"></div>
+                            <div><label class="text-[8px] text-slate-400 block">Resin ($/kg)</label><input type="number" id="inpResinPrice" value="2.10" step="0.1" class="jsw-field w-full p-1 text-center text-emerald-400"></div>
+                            <div><label class="text-[8px] text-slate-400 block">Mach Rate ($/hr)</label><input type="number" id="inpMachineRate" value="28.0" class="jsw-field w-full p-1 text-center text-amber-400"></div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 font-mono-tech text-center">
+                            <div class="p-1.5 rounded bg-[#080c14]"><span class="text-[7.5px] text-slate-500 block">PART WT</span><span id="mesPartWt" class="text-xs font-bold">18.2 g</span></div>
+                            <div class="p-1.5 rounded bg-[#080c14]"><span class="text-[7.5px] text-slate-500 block">RESIN REQ</span><span id="mesTotalResinKg" class="text-xs font-bold text-cyan-400">214 kg</span></div>
+                            <div class="p-1.5 rounded bg-[#080c14]"><span class="text-[7.5px] text-slate-500 block">LEAD TIME</span><span id="mesLeadTime" class="text-xs font-bold text-amber-400">26.6 hrs</span></div>
+                            <div class="p-1.5 rounded bg-[#080c14]"><span class="text-[7.5px] text-slate-500 block">COST / PC</span><span id="mesCostPerPart" class="text-xs font-bold text-emerald-400">$0.119</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TELEMETRY CHART -->
+                <div class="bg-[#0b111d] border border-[#18243a] rounded-xl p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <div class="flex flex-wrap gap-1 bg-[#070b12] p-1 rounded-lg border border-[#162236]">
+                            <button onclick="switchChartMode('vp')" id="btnChartVP" class="px-2 py-0.5 rounded text-[9px] font-mono-tech font-bold bg-emerald-500 text-black">V-P WAVEFORM</button>
+                            <button onclick="switchChartMode('svg')" id="btnChartSVG" class="px-2 py-0.5 rounded text-[9px] font-mono-tech font-bold text-amber-400">VALVE GATE TIMING</button>
+                            <button onclick="switchChartMode('viscosity')" id="btnChartVisc" class="px-2 py-0.5 rounded text-[9px] font-mono-tech font-bold text-slate-400">VISCOSITY CURVE</button>
+                            <button onclick="switchChartMode('gateseal')" id="btnChartSeal" class="px-2 py-0.5 rounded text-[9px] font-mono-tech font-bold text-slate-400">GATE SEAL / PvT</button>
+                        </div>
+                        <span class="text-[8.5px] font-mono-tech text-emerald-400 font-bold">LIVE TELEMETRY</span>
+                    </div>
+                    <div class="h-36 w-full"><canvas id="syscomChart"></canvas></div>
+                </div>
+
+                <!-- AI CO-PILOT DIAGNOSTICS -->
+                <div class="bg-[#0c1322] border border-[#1c2942] rounded-xl p-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-hmi font-bold uppercase text-white"><i class="fas fa-robot text-emerald-400 mr-1.5"></i>MORIROKU Mieruka AI Process & Valve Gate Co-Pilot</h4>
+                        <span id="badgeMoldingStatus" class="px-2 py-0.5 rounded text-[9.5px] font-mono-tech font-bold bg-emerald-950/70 border border-emerald-600 text-emerald-400">OPTIMAL</span>
+                    </div>
+                    <div id="defectsList" class="space-y-1.5 text-xs"></div>
+                    <div class="grid grid-cols-4 gap-2 pt-1.5 border-t border-[#172338] text-center font-mono-tech">
+                        <div class="p-1 rounded bg-[#070b12]"><span class="text-[7.5px] text-slate-500 block">CYCLE TIME</span><span id="resCycleTime" class="text-xs font-bold">19.2 s</span></div>
+                        <div class="p-1 rounded bg-[#070b12]"><span class="text-[7.5px] text-slate-500 block">REQ CLAMP</span><span id="resClampReq" class="text-xs font-bold text-emerald-400">128 T</span></div>
+                        <div class="p-1 rounded bg-[#070b12]"><span class="text-[7.5px] text-slate-500 block">GATE &Delta;P</span><span id="resGateDeltaP" class="text-xs font-bold text-amber-400">18.4 MPa</span></div>
+                        <div class="p-1 rounded bg-[#070b12]"><span class="text-[7.5px] text-slate-500 block">SEAL / PIN CLOSE</span><span id="resGateFreeze" class="text-xs font-bold text-cyan-400">3.8 s</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANE: 3D MOLDFLOW CAE -->
+        <div id="caePane" class="w-full lg:w-1/2 flex flex-col bg-[#04060a] relative h-full">
+            <!-- Top Toolbar -->
+            <div class="absolute top-3 left-3 right-12 z-30 flex flex-wrap items-center gap-1.5">
+                <div class="bg-[#0c1322]/90 border border-[#1d2c47] rounded-xl p-1 flex items-center gap-1">
+                    <span class="text-[8px] font-mono-tech text-slate-400 pl-1 font-bold">CAD:</span>
+                    <select id="selPreset3D" onchange="loadPresetCAD(this.value)" class="bg-[#131e36] text-white text-[10.5px] font-semibold py-1 px-1.5 rounded-lg outline-none">
+                        <option value="phone">Smart Case (Thin-Wall)</option>
+                        <option value="bracket">Auto Bumper Bracket (Multi-Gate)</option>
+                        <option value="gear">Precision Helical Gear</option>
+                        <option value="medical">Medical Syringe Flange</option>
+                        <option value="cup">Packaging Tumbler Cup</option>
+                    </select>
+                </div>
+                <div class="bg-[#0c1322]/90 border border-[#1d2c47] rounded-xl p-1 flex items-center gap-1">
+                    <span class="text-[8px] font-mono-tech text-amber-400 pl-1 font-bold">GATE TYPE:</span>
+                    <select id="selGateType" onchange="onGateTypeSelectChanged()" class="bg-[#131e36] text-amber-300 text-[10.5px] font-semibold py-1 px-1.5 rounded-lg outline-none">
+                        <option value="valve" selected>Valve Gate (SVG Pin)</option>
+                        <option value="pin">Pin / Sprue Gate</option>
+                        <option value="edge">Edge / Fan Gate (W×H)</option>
+                        <option value="tunnel">Submarine / Tunnel</option>
+                    </select>
+                </div>
+                <div class="bg-[#0c1322]/95 border border-emerald-500/40 rounded-xl px-2 py-1 flex items-center gap-1.5">
+                    <span class="text-[8px] font-mono-tech text-emerald-400 font-bold">DIM (t=<span id="lblWallT3D">2.2</span>mm):</span>
+                    <span id="badge3DGateDim" class="text-[10px] font-mono-tech font-bold text-white">Ø1.87 × L1.1mm</span>
+                </div>
+                <button onclick="setupCascade3GatesPreset()" class="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 rounded-xl px-2.5 py-1.5 text-[10px] font-mono-tech font-bold"><i class="fas fa-sitemap mr-1"></i>3-GATE SVG</button>
+                <button onclick="toggleProbeMode()" id="btnProbeMode" class="bg-[#0c1322]/90 border border-[#1d2c47] text-slate-300 rounded-xl px-2.5 py-1.5 text-[10px] font-mono-tech font-bold"><i class="fas fa-crosshairs text-cyan-400 mr-1"></i>PROBE</button>
+                <button onclick="toggleCoolingPipes()" id="btnCoolingPipes" class="bg-[#0c1322]/90 border border-[#1d2c47] text-slate-300 rounded-xl px-2.5 py-1.5 text-[10px] font-mono-tech font-bold"><i class="fas fa-snowflake text-sky-400 mr-1"></i>COOLING</button>
+                <label class="bg-[#0c1322]/90 border border-[#1d2c47] text-white rounded-xl px-2.5 py-1.5 text-[10px] font-semibold cursor-pointer"><i class="fas fa-upload text-emerald-400 mr-1"></i>STL/OBJ<input type="file" id="fileUploader" accept=".stl,.obj" class="hidden" onchange="handleCustomCADUpload(event)"></label>
+            </div>
+
+            <!-- View Buttons -->
+            <div class="absolute top-3 right-3 z-30 bg-[#0c1322]/90 border border-[#1d2c47] rounded-xl p-1 flex flex-col gap-1">
+                <button onclick="setCADView('iso')" class="w-7 h-7 rounded bg-[#141f36] hover:bg-cyan-600 text-xs font-mono-tech font-bold">ISO</button>
+                <button onclick="setCADView('top')" class="w-7 h-7 rounded bg-[#141f36] hover:bg-cyan-600 text-xs font-mono-tech font-bold">TOP</button>
+                <button onclick="toggleMeshWireframe()" class="w-7 h-7 rounded bg-[#141f36] hover:bg-purple-600 text-xs"><i class="fas fa-border-all"></i></button>
+                <button onclick="setCADView('fit')" class="w-7 h-7 rounded bg-emerald-600/30 text-emerald-400 text-xs"><i class="fas fa-compress"></i></button>
+            </div>
+
+            <!-- 6 CAE Contour Modes + Interactive Guide Button -->
+            <div class="absolute top-14 left-3 z-30 bg-[#0c1322]/95 border border-[#1d2c47] rounded-xl p-1 flex flex-wrap items-center gap-1 mt-1 shadow-xl">
+                <button onclick="setCAEResultMode('fill')" id="btnModeFill" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech bg-emerald-500 text-black">1. FILL TIME</button>
+                <button onclick="setCAEResultMode('gatezone')" id="btnModeGateZone" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech text-amber-400">2. GATE FLOW ZONES</button>
+                <button onclick="setCAEResultMode('temp')" id="btnModeTemp" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech text-slate-400">3. MELT TEMP</button>
+                <button onclick="setCAEResultMode('press')" id="btnModePress" class="px-2 py-1 rounded text-[9px] font-mono-tech text-slate-400">4. CAVITY PRESS</button>
+                <button onclick="setCAEResultMode('shear')" id="btnModeShear" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech text-slate-400">5. SHEAR STRESS</button>
+                <button onclick="setCAEResultMode('sink')" id="btnModeSink" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech text-slate-400">6. SINK / WARP</button>
+                <div class="h-4 w-px bg-[#223454] mx-0.5"></div>
+                <button onclick="toggleCAEInspectorCard()" id="btnToggleInspector" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30" title="Tampilkan/Sembunyikan Penjelasan Kontur Aktif"><i class="fas fa-circle-info mr-1"></i>PENJELASAN</button>
+                <button onclick="toggleCAEGuideModal(true)" class="px-2 py-1 rounded text-[9px] font-bold font-mono-tech bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30" title="Buka Panduan Lengkap 6 Diagram CAE"><i class="fas fa-book-open mr-1"></i>KAMUS CAE</button>
+            </div>
+
+            <!-- Screw + Live Valve Gate Status HUD -->
+            <div class="absolute top-28 left-3 z-30 bg-[#0a101d]/95 border border-[#1a2842] border-l-4 border-l-emerald-400 p-2.5 rounded-xl w-68 pointer-events-none mt-1 space-y-1.5">
+                <div class="flex justify-between items-center border-b border-[#18253d] pb-1">
+                    <span id="hudPhaseTitle" class="text-[10px] font-hmi font-bold text-emerald-400 uppercase">1. INJECTION FILL</span>
+                    <span id="hudSimTime" class="text-[10px] font-mono-tech font-bold text-white">1.80 s</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1 text-center font-mono-tech text-[10px]">
+                    <div class="bg-[#060a11] p-1 rounded"><span class="text-[7px] text-slate-500 block">VEL</span><span id="hudSpeed" class="font-bold text-emerald-400">65%</span></div>
+                    <div class="bg-[#060a11] p-1 rounded"><span class="text-[7px] text-slate-500 block">PRESS</span><span id="hudPress" class="font-bold text-amber-400">145 MPa</span></div>
+                    <div class="bg-[#060a11] p-1 rounded"><span class="text-[7px] text-slate-500 block">SCREW POS</span><span id="hudCheckRing" class="font-bold text-cyan-400">10.0 mm</span></div>
+                </div>
+                <div class="h-4 w-full bg-[#1b0d0d] rounded border border-[#3b1717] relative overflow-hidden flex items-center px-2">
+                    <div id="hudMeltGradient" class="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-orange-600 to-rose-500 w-full origin-left"></div>
+                    <div id="hudScrewBar" class="absolute top-0.5 bottom-0.5 w-2.5 bg-white rounded z-10" style="left: 15%;"></div>
+                    <div class="w-full flex justify-between text-[6.5px] font-mono-tech text-white/80 z-20"><span>CUSHION</span><span>V-P</span><span>SHOT</span></div>
+                </div>
+                <!-- Live Valve Gate Pin Status Strip -->
+                <div id="hudValveGatesStrip" class="pt-1 border-t border-[#18253d] flex flex-wrap gap-1 text-[8.5px] font-mono-tech"></div>
+            </div>
+
+            <!-- Live CAE Contour Explainer HUD Card (Top-Right below view buttons) -->
+            <div id="caeInspectorCard" class="absolute top-28 right-3 z-30 bg-[#09101d]/95 border border-cyan-500/40 rounded-xl p-3 w-72 shadow-2xl mt-1 space-y-2 transition-all duration-200">
+                <div class="flex items-center justify-between border-b border-[#18263e] pb-1.5">
+                    <div class="flex items-center gap-1.5">
+                        <span id="inspBadgeNum" class="w-4 h-4 rounded bg-emerald-500 text-black font-mono-tech font-bold text-[9px] flex items-center justify-center">1</span>
+                        <span id="inspModeTitle" class="text-[10.5px] font-hmi font-bold text-white uppercase">FILL TIME (WAKTU ISI)</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="toggleCAEGuideModal(true)" class="text-[9px] font-mono-tech text-cyan-400 hover:underline px-1">Detail</button>
+                        <button onclick="toggleCAEInspectorCard(false)" class="text-slate-400 hover:text-white text-xs px-1"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <p id="inspModeSummary" class="text-[10px] text-slate-300 leading-relaxed">Menampilkan perambatan waktu lelehan plastik (*melt front*) dari titik Gate hingga ujung terjauh kavitas.</p>
+                <div id="inspColorMeaning" class="grid grid-cols-2 gap-1.5 text-[9px] font-mono-tech"></div>
+                <div class="p-2 rounded-lg bg-[#060a12] border border-[#16233a] space-y-1">
+                    <div class="flex justify-between items-center text-[9px] font-mono-tech">
+                        <span class="text-slate-400">Bacaan Aktual:</span>
+                        <span id="inspLiveMetric" class="text-emerald-400 font-bold">0.00s - 1.80s</span>
+                    </div>
+                    <div id="inspEngineeringTip" class="text-[9px] text-amber-300/90 leading-snug"></div>
+                </div>
+            </div>
+
+            <!-- Probe Tooltip -->
+            <div id="probeTooltip" class="fixed z-50 pointer-events-none hidden bg-[#090f1c]/95 border border-cyan-400/60 rounded-xl p-2.5 shadow-2xl text-[10px] font-mono-tech text-white min-w-[190px]">
+                <div class="flex justify-between border-b border-[#1b2b48] pb-1 mb-1 text-cyan-400 font-bold"><span>NODE PROBE</span><span id="probeNodeId">#0</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Fed by Gate:</span><span id="probeGateOwner" class="text-amber-300 font-bold">VG-1</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Arrival Time:</span><span id="probeFillTime" class="text-emerald-400 font-bold">0.8s</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Melt Temp:</span><span id="probeTemp" class="text-amber-400 font-bold">225°C</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Cavity Press:</span><span id="probePress" class="text-cyan-300 font-bold">65 MPa</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Shear Stress:</span><span id="probeShear" class="text-rose-400 font-bold">0.28 MPa</span></div>
+            </div>
+
+            <!-- 3D Canvas -->
+            <div id="threeCanvasWrapper" class="w-full h-full relative cursor-grab active:cursor-grabbing">
+                <div id="pinsOverlay" class="absolute inset-0 pointer-events-none z-30 overflow-hidden"></div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="absolute bottom-3 left-3 right-3 z-30 bg-[#0b111e]/95 border border-[#1c2a44] p-2.5 rounded-2xl flex items-center gap-3">
+                <button onclick="toggleCAEPlayPause()" class="w-9 h-9 rounded-xl bg-emerald-500 text-black flex items-center justify-center font-bold text-xs"><i class="fas fa-play" id="iconPlay"></i></button>
+                <button onclick="restartCAESimulation()" class="w-8 h-8 rounded-xl bg-[#152035] text-slate-300 flex items-center justify-center text-xs"><i class="fas fa-rotate-left"></i></button>
+                <input type="range" id="simTimeline" min="0" max="100" step="0.5" value="100" oninput="userScrubTimeline(parseFloat(this.value))" class="flex-1 accent-emerald-400 h-1.5 bg-[#172338] rounded-lg cursor-pointer">
+                <span id="txtTimelinePercent" class="text-xs font-mono-tech font-bold text-emerald-400 w-11 text-right">100%</span>
+                <div class="border-l border-[#1d2d48] pl-3 flex items-center gap-2">
+                    <span id="txtGateCount" class="text-[10px] font-mono-tech font-bold text-cyan-300">1x VALVE (Ø1.87mm)</span>
+                    <button onclick="resetGates()" class="px-2 py-1 rounded bg-rose-950/50 text-rose-400 border border-rose-800/50 text-[9px] font-mono-tech font-bold">CLEAR</button>
+                </div>
+            </div>
+
+            <!-- Upgraded Dynamic Multi-Tick CAE Spectrum Legend -->
+            <div onclick="toggleCAEGuideModal(true)" title="Klik untuk membuka penjelasan lengkap spektrum CAE" class="absolute bottom-20 right-3 z-30 bg-[#0a101d]/95 hover:bg-[#0f182b] border border-[#1e2f4d] hover:border-cyan-500/50 px-3.5 py-2.5 rounded-xl w-64 cursor-pointer transition-all shadow-2xl">
+                <div class="flex items-center justify-between text-[9.5px] font-mono-tech font-bold mb-1">
+                    <span id="legendTitle" class="text-white uppercase flex items-center gap-1.5"><i class="fas fa-circle-question text-cyan-400"></i>CAE: FILL TIME</span>
+                    <span id="legendUnit" class="text-emerald-400">0.00 - 1.80 s</span>
+                </div>
+                <!-- Continuous Spectrum Bar -->
+                <div id="legendGradientBar" class="h-2.5 w-full rounded-full border border-white/10" style="background: linear-gradient(to right, #0011ff, #00d4ff, #00ff73, #fffb00, #ff0037);"></div>
+                <!-- 5 Scale Ticks -->
+                <div id="legendTicksRow" class="flex justify-between text-[8px] font-mono-tech text-slate-300 mt-1">
+                    <span id="legTick0">0.0s</span>
+                    <span id="legTick1">0.4s</span>
+                    <span id="legTick2">0.9s</span>
+                    <span id="legTick3">1.3s</span>
+                    <span id="legTick4">1.8s</span>
+                </div>
+                <!-- Discrete Gate Zone Legend (Shown in Mode 2) -->
+                <div id="legendDiscreteZones" class="hidden flex-wrap gap-1 mt-1 text-[8px] font-mono-tech"></div>
+                <!-- Quick Low/High Semantic Labels -->
+                <div class="flex justify-between text-[7.5px] font-mono-tech mt-1 pt-1 border-t border-[#17243a]">
+                    <span id="legendLowLabel" class="text-sky-400">BIRU: Awal Gate</span>
+                    <span id="legendHighLabel" class="text-rose-400">MERAH: Akhir Isi / Vents</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const RESIN_DB = {
+            'PP': { name: 'Polypropylene Homo', morph: 'SEMI-CRYSTALLINE', meltTemp: 225, moldTemp: 45, ejectTemp: 95, mfi: 12, density: 0.75, solidDensity: 0.90, alpha: 0.088, shrink: '1.4-1.8%', shrinkNum: 1.6, viscRef: 110, shearLimit: 60000, drying: 'No Drying Req' },
+            'ABS': { name: 'ABS High Impact', morph: 'AMORPHOUS', meltTemp: 240, moldTemp: 60, ejectTemp: 88, mfi: 19, density: 0.94, solidDensity: 1.04, alpha: 0.095, shrink: '0.4-0.7%', shrinkNum: 0.55, viscRef: 170, shearLimit: 50000, drying: '80°C x 3h' },
+            'PC': { name: 'Polycarbonate', morph: 'AMORPHOUS', meltTemp: 295, moldTemp: 90, ejectTemp: 135, mfi: 10, density: 1.06, solidDensity: 1.20, alpha: 0.110, shrink: '0.5-0.7%', shrinkNum: 0.6, viscRef: 310, shearLimit: 40000, drying: '120°C x 4h' },
+            'PA66': { name: 'PA66-GF30', morph: 'SEMI-CRYSTALLINE', meltTemp: 285, moldTemp: 85, ejectTemp: 140, mfi: 22, density: 1.18, solidDensity: 1.36, alpha: 0.125, shrink: '0.3-0.6%', shrinkNum: 0.45, viscRef: 145, shearLimit: 75000, drying: '80°C x 4h' },
+            'POM': { name: 'POM Polyacetal', morph: 'SEMI-CRYSTALLINE', meltTemp: 205, moldTemp: 80, ejectTemp: 115, mfi: 9, density: 1.15, solidDensity: 1.41, alpha: 0.085, shrink: '1.8-2.2%', shrinkNum: 2.0, viscRef: 200, shearLimit: 45000, drying: '85°C x 2h' },
+            'PBT': { name: 'PBT Connector', morph: 'SEMI-CRYSTALLINE', meltTemp: 255, moldTemp: 70, ejectTemp: 120, mfi: 16, density: 1.12, solidDensity: 1.31, alpha: 0.105, shrink: '1.2-1.8%', shrinkNum: 1.5, viscRef: 160, shearLimit: 55000, drying: '120°C x 3h' },
+            'PMMA': { name: 'PMMA Optical', morph: 'AMORPHOUS', meltTemp: 235, moldTemp: 65, ejectTemp: 85, mfi: 8, density: 1.05, solidDensity: 1.19, alpha: 0.092, shrink: '0.3-0.6%', shrinkNum: 0.45, viscRef: 260, shearLimit: 35000, drying: '85°C x 3h' },
+            'PEEK': { name: 'PEEK Aerospace', morph: 'SEMI-CRYSTALLINE', meltTemp: 375, moldTemp: 175, ejectTemp: 210, mfi: 7, density: 1.14, solidDensity: 1.30, alpha: 0.130, shrink: '1.1-1.4%', shrinkNum: 1.25, viscRef: 380, shearLimit: 50000, drying: '150°C x 3h' }
+        };
+
+        const MACHINE_DB = {
+            '110': { ton: 110, screwDia: 36, maxShotMm: 140, maxInjVel: 200, servoKw: 4.8 },
+            '180': { ton: 180, screwDia: 40, maxShotMm: 160, maxInjVel: 180, servoKw: 6.8 },
+            '280': { ton: 280, screwDia: 50, maxShotMm: 200, maxInjVel: 165, servoKw: 9.5 },
+            '350': { ton: 350, screwDia: 58, maxShotMm: 230, maxInjVel: 160, servoKw: 12.2 },
+            '550': { ton: 550, screwDia: 68, maxShotMm: 280, maxInjVel: 150, servoKw: 16.5 },
+            '850': { ton: 850, screwDia: 84, maxShotMm: 340, maxInjVel: 140, servoKw: 24.0 },
+            '1300': { ton: 1300, screwDia: 100, maxShotMm: 420, maxInjVel: 130, servoKw: 34.5 }
+        };
+
+        let caeResultMode = 'fill', activeChartMode = 'vp', currentPresetName = 'phone';
+        let isSimulationRunning = false, isSimulationPaused = false, isProbeActive = false, isCoolingVisible = false;
+        let isInspectorVisible = true;
+        let animationFrameId = null, lastFrameTimestamp = 0, realtimeDebounceTimer = null;
+
+        // Comprehensive Engineering Dictionary for the 6 CAE Modes & Spectrum Bar
+        const CAE_MODE_DOCS = {
+            fill: {
+                num: '1',
+                code: 'CAE: FILL TIME',
+                title: 'FILL TIME (WAKTU PENGISIAN)',
+                shortDesc: 'Memetakan waktu kedatangan lelehan polimer (Melt Front Arrival Time) dari titik Gate hingga ujung kavitas.',
+                lowMeaning: 'BIRU: Area awal di sekitar Gate (0.0s)',
+                highMeaning: 'MERAH: Area terakhir terisi (Risiko Air Trap / Short Shot)',
+                colorBoxes: [
+                    { color: 'bg-blue-600', label: 'Biru (Awal)', desc: 'Aliran awal saat plastik baru keluar dari Orifice Gate.' },
+                    { color: 'bg-emerald-500', label: 'Hijau (Tengah)', desc: 'Aliran merambat stabil di sepanjang dinding produk.' },
+                    { color: 'bg-yellow-400', label: 'Kuning (Akhir)', desc: 'Aliran mendekati tepi produk / zona transisi V-P.' },
+                    { color: 'bg-rose-600', label: 'Merah (Ujung)', desc: 'Titik paling akhir terisi. Wajib dipasang Venting udara!' }
+                ],
+                formula: 't_arrival(x) = T_open(Gate_k) + (Jarak_Aliran / Kecepatan_Melt)',
+                svgImpact: 'Jika Valve Gate (VG-2, VG-3) memiliki delay T_open terlalu lama atau T_close terlalu cepat, kontur akan berubah drastis dan memicu Short Shot.',
+                defectLink: 'Short Shot (Kurang Isi), Air Trap / Burn Mark (Udara Terjebak), Hesitation, dan Weld Line.'
+            },
+            gatezone: {
+                num: '2',
+                code: 'CAE: GATE ZONES',
+                title: 'GATE FLOW ZONES (ZONA ALIRAN VALVE GATE)',
+                shortDesc: 'Menunjukkan wilayah kavitas yang diisi oleh masing-masing Valve Gate (VG-1, VG-2, VG-3, dst.) beserta persentase volumenya.',
+                lowMeaning: 'VG-1 (Hijau): Zona Gate Utama',
+                highMeaning: 'VG-2 / VG-3: Zona Gate Sekuensial',
+                colorBoxes: [
+                    { color: 'bg-emerald-400', label: 'VG-1 (Hijau)', desc: 'Area produk yang disuplai oleh Valve Gate #1 (Lead Gate).' },
+                    { color: 'bg-amber-400', label: 'VG-2 (Kuning)', desc: 'Area produk yang disuplai oleh Valve Gate #2.' },
+                    { color: 'bg-cyan-400', label: 'VG-3 (Biru Muda)', desc: 'Area produk yang disuplai oleh Valve Gate #3.' },
+                    { color: 'bg-rose-500', label: 'Garis Merah', desc: 'Pertemuan 2 aliran simultan (Weld Line aktif jika tidak Cascade).' }
+                ],
+                formula: 'Owner(Node_i) = argmin_k [ T_open(k) + d(i, Gate_k) / v_flow ]',
+                svgImpact: 'Semakin awal sebuah Valve Gate dibuka (T_open kecil), semakin luas persentase zona kavitas yang dikuasai oleh gate tersebut.',
+                defectLink: 'Flow Imbalance (Ketidakseimbangan Aliran), Overpacking pada satu sisi, dan posisi garis sambungan (Weld Line).'
+            },
+            temp: {
+                num: '3',
+                code: 'CAE: MELT TEMP',
+                title: 'MELT TEMP (DISTRIBUSI SUHU LELEHAN °C)',
+                shortDesc: 'Menampilkan profil temperatur lelehan polimer (°C) di dalam kavitas akibat pendinginan dinding mold & panas gesek (Shear Heating).',
+                lowMeaning: 'BIRU: Suhu Turun (Ujung Aliran / Cold Front)',
+                highMeaning: 'MERAH: Suhu Tinggi (Inti Aliran / Dekat Gate)',
+                colorBoxes: [
+                    { color: 'bg-red-600', label: 'Merah (Panas)', desc: 'Suhu leleh tertinggi di sekitar Gate & akibat Shear Heating.' },
+                    { color: 'bg-yellow-400', label: 'Kuning (Optimal)', desc: 'Suhu lelehan masih berada dalam jendela viskositas ideal.' },
+                    { color: 'bg-emerald-500', label: 'Hijau (Mulai Dingin)', desc: 'Kehilangan panas moderat ke dinding cetakan (Mold MTC).' },
+                    { color: 'bg-blue-600', label: 'Biru (Dingin)', desc: 'Penurunan suhu drastis di ujung aliran. Risiko pembekuan dini!' }
+                ],
+                formula: 'T_melt(x) = T_barrel - ΔT_cooling(L/t, v_inj) + ΔT_shear(γ̇)',
+                svgImpact: 'Pembukaan Sequential Valve Gate menyuntikkan polimer segar bersuhu tinggi (Merah) langsung ke zona tengah/ujung sehingga mencegah penurunan suhu ekstrem (Biru).',
+                defectLink: 'Cold Weld Line (sambungan lemah/mudah patah), Flow Mark / Record Grooves, Gloss Difference, dan Short Shot.'
+            },
+            press: {
+                num: '4',
+                code: 'CAE: CAVITY PRESS',
+                title: 'CAVITY PRESS (DISTRIBUSI TEKANAN MPa)',
+                shortDesc: 'Memetakan distribusi tekanan hidrolik polimer (MPa) dari titik injeksi Gate hingga penurunan tekanan (Pressure Drop) di ujung kavitas.',
+                lowMeaning: 'BIRU: Tekanan Rendah (Ujung Aliran)',
+                highMeaning: 'MERAH: Tekanan Puncak (Area Gate)',
+                colorBoxes: [
+                    { color: 'bg-red-600', label: 'Merah (Peak MPa)', desc: 'Tekanan maksimum tepat di mulut Gate. Hati-hati risiko Flashing!' },
+                    { color: 'bg-yellow-400', label: 'Kuning (Tengah)', desc: 'Gradien transmisi tekanan selama fase Filling & Packing.' },
+                    { color: 'bg-emerald-500', label: 'Hijau (Transisi)', desc: 'Tekanan kavitas moderat untuk memadatkan penyusutan polimer.' },
+                    { color: 'bg-blue-600', label: 'Biru (Drop Rendah)', desc: 'Tekanan terendah di ujung jauh. Jika terlalu rendah memicu Sink Mark.' }
+                ],
+                formula: 'P_cav(x) = (P_inj - ΔP_gate) × (1 - x / L_eff)',
+                svgImpact: 'Multi-Valve Gate memangkas jarak aliran efektif (L_eff) sehingga mengurangi Pressure Drop dan meratakan tekanan kavitas tanpa melampaui Clamp Tonnage.',
+                defectLink: 'Mold Flashing (Bocor/Burr akibat zona Merah berlebihan) vs Sink Mark / Void (akibat zona Biru kurang tekanan packing).'
+            },
+            shear: {
+                num: '5',
+                code: 'CAE: SHEAR STRESS',
+                title: 'SHEAR STRESS (TEGANGAN GESER DINDING MPa)',
+                shortDesc: 'Mengukur tegangan gesek molekul polimer terhadap dinding mold & orifice gate (Wall Shear Stress dalam MPa).',
+                lowMeaning: 'BIRU: Geseran Rendah (Aman)',
+                highMeaning: 'MERAH: Geseran Tinggi (Risiko Degradasi)',
+                colorBoxes: [
+                    { color: 'bg-blue-600', label: 'Biru (Rendah)', desc: 'Tegangan geser rendah, rantai molekul polimer rileks.' },
+                    { color: 'bg-emerald-500', label: 'Hijau (Ideal)', desc: 'Shear thinning optimal (viskositas turun tanpa merusak polimer).' },
+                    { color: 'bg-yellow-400', label: 'Kuning (Waspada)', desc: 'Orientasi molekul tinggi, mulai menyimpan tegangan sisa.' },
+                    { color: 'bg-red-600', label: 'Merah (Kritis)', desc: 'Geseran ekstrem di area Gate sempit! Memicu Silver Streak & retak.' }
+                ],
+                formula: 'τ_wall = η_eff × γ̇_gate  (Batas aman umumnya < 0.35 - 0.50 MPa)',
+                svgImpact: 'Jika ukuran Diameter Gate (Ø) terlalu kecil dibanding tebal dinding (t) atau hanya 1 Valve Gate yang dibuka saat kecepatan tinggi, Shear Stress melonjak ke zona Merah.',
+                defectLink: 'Silver Streak / Splay Marks, Jetting, Polymer Chain Degradation, dan Crazing / Stress Cracking pada komponen optik (PC/PMMA).'
+            },
+            sink: {
+                num: '6',
+                code: 'CAE: SINK / WARP',
+                title: 'SINK MARK & WARPAGE (PENYUSUTAN VOLUMETRIK %)',
+                shortDesc: 'Memprediksi persentase penyusutan volumetrik lokal (%) yang menyebabkan cekungan permukaan (Sink Mark) dan melengkung (Warpage).',
+                lowMeaning: 'BIRU: Penyusutan Minimal (Stabil)',
+                highMeaning: 'MERAH: Rawan Sink Mark & Melengkung',
+                colorBoxes: [
+                    { color: 'bg-blue-600', label: 'Biru (Stabil)', desc: 'Area terkompensasi baik oleh Holding Pressure.' },
+                    { color: 'bg-emerald-500', label: 'Hijau (Normal)', desc: 'Penyusutan berada dalam batas toleransi cetakan.' },
+                    { color: 'bg-yellow-400', label: 'Kuning (Sensitif)', desc: 'Perbedaan susut mulai muncul, perlu pendinginan MTC seimbang.' },
+                    { color: 'bg-red-600', label: 'Merah (Sink/Warp)', desc: 'Penyusutan tinggi di area tebal atau jauh dari Gate!' }
+                ],
+                formula: 'S_vol(%) = Shrink_Resin × (t / 2) × f(Holding_MPa, Gate_Seal_Time)',
+                svgImpact: 'Menahan pin Valve Gate tetap terbuka selama fase Holding (T_close > Gate Seal Time) memastikan tekanan packing terus mengkompensasi penyusutan.',
+                defectLink: 'Sink Mark (Cekungan pada rib/boss tebal), Void (Gelembung hampa di dalam part), dan Warpage (Part melintir saat ejeksi).'
+            }
+        };
+
+        // Gate geometry state (in mm, proportional to wall thickness t)
+        let gateGeometry = {
+            type: 'valve',
+            dia: 1.87,      // Orifice / Pin diameter (mm)
+            width: 1.87,    // Gate width W (mm)
+            thick: 1.87,    // Gate thickness/depth H (mm)
+            land: 1.10,     // Land length L (mm)
+            areaMm2: 2.75,  // Cross-sectional area (mm^2)
+            hydDia: 1.87    // Hydraulic diameter for shear rate & deltaP
+        };
+
+        // Valve Gate sequence configuration per gate index
+        let valveGatesConfig = [];
+
+        let calcProfile = {
+            totalInjTime: 1.8, holdTime: 5.2, coolTime: 12.5, minTheoCool: 10.8, dryCycle: 2.4,
+            totalCycleTime: 21.9, clampRequired: 128, maxPressure: 155, gateShearRate: 14200,
+            gateDeltaP: 18.4, gateSealTime: 3.8, partWeightG: 18.2, shotWeightG: 42.6,
+            reqShotStrokeMm: 60.5, sinkMarkIndex: 1.15
+        };
+
+        let scene, camera, renderer, controls, partMesh = null, coolingPipesGroup = null;
+        let gateObjects = [], gatePositionsWorld = [], gateNormalsWorld = [], defectPins = [];
+        let dynamicSimState = {
+            tProgress: 100,
+            arrivalTimes: null,   // Effective arrival time (sec) at each vertex
+            gateOwners: null,     // Which gate filled each vertex (0, 1, 2...)
+            weldMask: null,       // 1 if head-on collision weld line occurs, 0 if cascade-eliminated
+            maxArrivalTime: 1.8,
+            vertexCount: 0,
+            lastFillVertex: null,
+            weldLineCenter: null,
+            unfilledCount: 0
+        };
+        let syscomChartInstance = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initSyscomWaveformChart();
+            initThreeJSViewer();
+            applyResinProperties();
+            syncGateDimensionsToWallThickness();
+            loadPresetCAD('phone');
+        });
+
+        function setLayoutMode(mode) {
+            const p = document.getElementById('paramPane'), c = document.getElementById('caePane');
+            p.className = mode === 'cae' ? 'hidden' : (mode === 'param' ? 'w-full flex flex-col bg-[#070a11] z-20' : 'w-full lg:w-1/2 flex flex-col bg-[#070a11] border-r border-[#141d2e] z-20');
+            c.className = mode === 'param' ? 'hidden' : (mode === 'cae' ? 'w-full flex flex-col bg-[#04060a] relative h-full' : 'w-full lg:w-1/2 flex flex-col bg-[#04060a] relative h-full');
+            setTimeout(onThreeResize, 200);
+        }
+
+        function switchHMITab(tabId, btnEl) {
+            document.querySelectorAll('.syscom-tab').forEach(t => { t.classList.remove('active'); t.classList.add('text-slate-400'); });
+            document.querySelectorAll('.hmi-tab-body').forEach(b => b.classList.add('hidden'));
+            if (btnEl) { btnEl.classList.add('active'); btnEl.classList.remove('text-slate-400'); }
+            document.getElementById(tabId).classList.remove('hidden');
+        }
+
+        function showNotification(msg, icon = 'fa-microchip', color = '#00ff9d') {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            const ic = document.getElementById('toastIcon');
+            ic.className = `fas ${icon}`; ic.style.color = color;
+            t.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => t.classList.add('opacity-0', 'pointer-events-none'), 2400);
+        }
+
+        function handleRealtimeParamChange() {
+            clearTimeout(realtimeDebounceTimer);
+            realtimeDebounceTimer = setTimeout(() => executeMoldingSimulation(false), 45);
+        }
+
+        // =========================================================================
+        // 1. PROPORTIONAL GATE GEOMETRY LINKED TO PART WALL THICKNESS (t)
+        // =========================================================================
+        function onWallThicknessChanged() {
+            const t = Math.max(0.5, parseFloat(document.getElementById('inpWallThick').value) || 2.2);
+            document.getElementById('lblWallT3D').innerText = t.toFixed(1);
+            if (document.getElementById('chkAutoGateWall').checked) {
+                syncGateDimensionsToWallThickness();
+            }
+            updatePartMeshWallThicknessVisual(t);
+            rebuildGateMeshes();
+            handleRealtimeParamChange();
+        }
+
+        function onGateTypeSelectChanged() {
+            const gType = document.getElementById('selGateType').value;
+            gateGeometry.type = gType;
+            if (gType === 'valve') {
+                document.getElementById('selRunnerType').value = 'valve';
+            }
+            if (document.getElementById('chkAutoGateWall').checked) {
+                syncGateDimensionsToWallThickness();
+            } else {
+                recalculateGateFlowArea();
+            }
+            rebuildGateMeshes();
+            prepareDistanceFields();
+            handleRealtimeParamChange();
+        }
+
+        function onRunnerSystemChanged() {
+            const rType = document.getElementById('selRunnerType').value;
+            if (rType === 'valve' && document.getElementById('selGateType').value !== 'valve') {
+                document.getElementById('selGateType').value = 'valve';
+                onGateTypeSelectChanged();
+                return;
+            }
+            handleRealtimeParamChange();
+        }
+
+        function syncGateDimensionsToWallThickness() {
+            const t = Math.max(0.5, parseFloat(document.getElementById('inpWallThick').value) || 2.2);
+            const gType = document.getElementById('selGateType').value;
+            gateGeometry.type = gType;
+
+            if (gType === 'valve') {
+                // Valve Gate (Hot Runner Pin): Orifice Ø = 0.85 * t (min 1.5mm)
+                const d = parseFloat(Math.max(1.4, t * 0.85).toFixed(2));
+                gateGeometry.dia = d;
+                gateGeometry.width = d;
+                gateGeometry.thick = d;
+                gateGeometry.land = parseFloat((t * 0.5).toFixed(2));
+                document.getElementById('badgeGateRule').innerText = `Valve Gate: Ø = 0.85×t (${d}mm)`;
+            } else if (gType === 'pin') {
+                // Pin / Sprue Gate: Ø = 0.65 * t
+                const d = parseFloat(Math.max(0.8, t * 0.65).toFixed(2));
+                gateGeometry.dia = d;
+                gateGeometry.width = d;
+                gateGeometry.thick = d;
+                gateGeometry.land = parseFloat((t * 0.45).toFixed(2));
+                document.getElementById('badgeGateRule').innerText = `Pin Gate: Ø = 0.65×t (${d}mm)`;
+            } else if (gType === 'edge') {
+                // Edge / Fan Gate: Thickness H = 0.65 * t, Width W = 2.5 * t, Land L = 0.5 * t
+                const h = parseFloat(Math.max(0.6, t * 0.65).toFixed(2));
+                const w = parseFloat(Math.max(1.8, t * 2.5).toFixed(2));
+                const l = parseFloat(Math.max(0.5, t * 0.5).toFixed(2));
+                gateGeometry.thick = h;
+                gateGeometry.width = w;
+                gateGeometry.dia = parseFloat(Math.sqrt((4 * w * h) / Math.PI).toFixed(2));
+                gateGeometry.land = l;
+                document.getElementById('badgeGateRule').innerText = `Edge Gate: W=2.5t (${w}mm) × H=0.65t (${h}mm)`;
+            } else if (gType === 'tunnel') {
+                // Submarine / Tunnel Gate: Ø = 0.60 * t
+                const d = parseFloat(Math.max(0.8, t * 0.60).toFixed(2));
+                gateGeometry.dia = d;
+                gateGeometry.width = d;
+                gateGeometry.thick = d;
+                gateGeometry.land = parseFloat((t * 0.6).toFixed(2));
+                document.getElementById('badgeGateRule').innerText = `Submarine Tunnel: Ø = 0.60×t (${d}mm)`;
+            }
+
+            document.getElementById('inpGateDiaHmi').value = gateGeometry.dia;
+            document.getElementById('inpGateWidthHmi').value = gateGeometry.width;
+            document.getElementById('inpGateThickHmi').value = gateGeometry.thick;
+            document.getElementById('inpGateLandHmi').value = gateGeometry.land;
+            recalculateGateFlowArea();
+        }
+
+        function onManualGateGeometryEdit(field) {
+            document.getElementById('chkAutoGateWall').checked = false;
+            const d = Math.max(0.4, parseFloat(document.getElementById('inpGateDiaHmi').value) || 1.6);
+            const w = Math.max(0.5, parseFloat(document.getElementById('inpGateWidthHmi').value) || 2.0);
+            const h = Math.max(0.3, parseFloat(document.getElementById('inpGateThickHmi').value) || 1.2);
+            const l = Math.max(0.4, parseFloat(document.getElementById('inpGateLandHmi').value) || 1.0);
+
+            if (gateGeometry.type === 'edge') {
+                gateGeometry.width = w;
+                gateGeometry.thick = h;
+                gateGeometry.dia = parseFloat(Math.sqrt((4 * w * h) / Math.PI).toFixed(2));
+                document.getElementById('inpGateDiaHmi').value = gateGeometry.dia;
+            } else {
+                gateGeometry.dia = d;
+                gateGeometry.width = d;
+                gateGeometry.thick = d;
+                document.getElementById('inpGateWidthHmi').value = d;
+                document.getElementById('inpGateThickHmi').value = d;
+            }
+            gateGeometry.land = l;
+            document.getElementById('badgeGateRule').innerText = `Manual Override`;
+            recalculateGateFlowArea();
+            rebuildGateMeshes();
+            handleRealtimeParamChange();
+        }
+
+        function recalculateGateFlowArea() {
+            if (gateGeometry.type === 'edge') {
+                gateGeometry.areaMm2 = parseFloat((gateGeometry.width * gateGeometry.thick).toFixed(2));
+                gateGeometry.hydDia = parseFloat(((2 * gateGeometry.width * gateGeometry.thick) / (gateGeometry.width + gateGeometry.thick)).toFixed(2));
+                document.getElementById('badge3DGateDim').innerText = `W${gateGeometry.width}×H${gateGeometry.thick}×L${gateGeometry.land}mm`;
+                document.getElementById('headerGateGeometry').innerText = `EDGE ${gateGeometry.width}×${gateGeometry.thick}mm`;
+            } else {
+                gateGeometry.areaMm2 = parseFloat((Math.PI * Math.pow(gateGeometry.dia / 2, 2)).toFixed(2));
+                gateGeometry.hydDia = gateGeometry.dia;
+                const prefix = gateGeometry.type === 'valve' ? 'VG' : gateGeometry.type.toUpperCase();
+                document.getElementById('badge3DGateDim').innerText = `${prefix} Ø${gateGeometry.dia} × L${gateGeometry.land}mm`;
+                document.getElementById('headerGateGeometry').innerText = `${prefix} Ø${gateGeometry.dia}mm`;
+            }
+            document.getElementById('txtGateFlowArea').innerText = `${gateGeometry.areaMm2} mm²`;
+            updateGateSpecText();
+            renderSVGMatrixTable();
+        }
+
+        function applyGatePresetSize(newDia) {
+            document.getElementById('chkAutoGateWall').checked = false;
+            document.getElementById('inpGateDiaHmi').value = newDia;
+            if (gateGeometry.type === 'edge') {
+                document.getElementById('inpGateThickHmi').value = newDia;
+                document.getElementById('inpGateWidthHmi').value = parseFloat((newDia * 2.5).toFixed(2));
+            }
+            onManualGateGeometryEdit('dia');
+            executeMoldingSimulation(true);
+        }
+
+        // =========================================================================
+        // 2. SEQUENTIAL VALVE GATE (SVG) MATRIX & CASCADE FLOW LOGIC
+        // =========================================================================
+        function syncValveGatesConfigArray() {
+            const count = gatePositionsWorld.length;
+            while (valveGatesConfig.length < count) {
+                const idx = valveGatesConfig.length;
+                valveGatesConfig.push({
+                    id: `VG-${idx + 1}`,
+                    triggerMode: 'time',
+                    openTime: idx === 0 ? 0.0 : parseFloat((idx * 0.45).toFixed(2)),
+                    openScrewPos: idx === 0 ? 62.0 : Math.max(15, 62 - idx * 16),
+                    closeTime: parseFloat((calcProfile.totalInjTime + calcProfile.holdTime - 0.2).toFixed(2)),
+                    isOpenNow: true
+                });
+            }
+            if (valveGatesConfig.length > count) {
+                valveGatesConfig.length = count;
+            }
+            const mode = document.getElementById('selSVGActuationMode').value;
+            if (mode === 'simultaneous') {
+                valveGatesConfig.forEach(vg => {
+                    vg.openTime = 0.0;
+                    vg.openScrewPos = parseFloat(document.getElementById('inpShotSize').value) || 62;
+                    vg.closeTime = parseFloat((calcProfile.totalInjTime + calcProfile.holdTime).toFixed(2));
+                });
+            } else if (mode === 'cascade') {
+                autoCalcCascadeTimers(false);
+            }
+            renderSVGMatrixTable();
+        }
+
+        function onSVGModeChange() {
+            syncValveGatesConfigArray();
+            prepareDistanceFields();
+            executeMoldingSimulation(true);
+        }
+
+        function autoCalcCascadeTimers(notify = true) {
+            if (gatePositionsWorld.length <= 1 || !partMesh) {
+                if (valveGatesConfig[0]) {
+                    valveGatesConfig[0].openTime = 0.0;
+                    valveGatesConfig[0].closeTime = parseFloat((calcProfile.totalInjTime + calcProfile.holdTime).toFixed(2));
+                }
+                renderSVGMatrixTable();
+                return;
+            }
+            // Calculate distance from VG-1 (Primary Gate) to each subsequent gate
+            const g0 = gatePositionsWorld[0];
+            const box = new THREE.Box3().setFromObject(partMesh);
+            const maxSpan = Math.max(10, box.min.distanceTo(box.max));
+            const injTime = Math.max(0.5, calcProfile.totalInjTime);
+            const flowSpeed3D = (maxSpan * 0.65) / injTime; // 3D units per sec
+            const shotSize = parseFloat(document.getElementById('inpShotSize').value) || 62;
+            const vpSwitch = parseFloat(document.getElementById('inpVPSwitch').value) || 10;
+
+            valveGatesConfig.forEach((vg, idx) => {
+                if (idx === 0) {
+                    vg.openTime = 0.0;
+                    vg.openScrewPos = shotSize;
+                    vg.closeTime = parseFloat((injTime + calcProfile.holdTime * 0.85).toFixed(2));
+                } else {
+                    const distFromG0 = g0.distanceTo(gatePositionsWorld[idx]);
+                    // Open just after melt front from VG-1 passes this gate location (+0.05s overlap)
+                    const cascadeDelay = Math.min(injTime * 0.82, parseFloat(((distFromG0 / flowSpeed3D) * 0.88).toFixed(2)));
+                    vg.openTime = cascadeDelay;
+                    const ratio = Math.min(0.9, cascadeDelay / injTime);
+                    vg.openScrewPos = parseFloat((shotSize - ratio * (shotSize - vpSwitch)).toFixed(1));
+                    vg.closeTime = parseFloat((injTime + calcProfile.holdTime).toFixed(2));
+                }
+            });
+            renderSVGMatrixTable();
+            if (notify) {
+                prepareDistanceFields();
+                executeMoldingSimulation(true);
+                showNotification("Cascade Valve Gate Timers Dioptimalkan!", "fa-faucet-drip", "#00ff9d");
+            }
+        }
+
+        function renderSVGMatrixTable() {
+            const tbody = document.getElementById('svgMatrixBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            const dimLabel = gateGeometry.type === 'edge'
+                ? `${gateGeometry.width}×${gateGeometry.thick}`
+                : `Ø${gateGeometry.dia}×L${gateGeometry.land}`;
+
+            valveGatesConfig.forEach((vg, i) => {
+                const tr = document.createElement('tr');
+                const badgeClass = vg.isOpenNow
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/40';
+                tr.innerHTML = `
+                    <td class="text-center font-mono-tech font-bold text-amber-400">${vg.id}</td>
+                    <td>
+                        <select onchange="onVGCellChange(${i}, 'triggerMode', this.value)" class="text-cyan-300">
+                            <option value="time" ${vg.triggerMode === 'time' ? 'selected' : ''}>Timer (s)</option>
+                            <option value="pos" ${vg.triggerMode === 'pos' ? 'selected' : ''}>Screw (mm)</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.05" min="0" max="10" value="${vg.openTime}" onchange="onVGCellChange(${i}, 'openTime', parseFloat(this.value))"></td>
+                    <td><input type="number" step="1" min="5" max="150" value="${vg.openScrewPos}" onchange="onVGCellChange(${i}, 'openScrewPos', parseFloat(this.value))"></td>
+                    <td><input type="number" step="0.1" min="0.2" max="25" value="${vg.closeTime}" onchange="onVGCellChange(${i}, 'closeTime', parseFloat(this.value))"></td>
+                    <td class="text-center font-mono-tech text-[10px] text-slate-300">${dimLabel}</td>
+                    <td class="text-center"><span id="vgStateBadge_${i}" class="px-1.5 py-0.5 rounded text-[8.5px] font-mono-tech font-bold ${badgeClass}">${vg.isOpenNow ? 'OPEN' : 'CLOSED'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function onVGCellChange(idx, field, val) {
+            if (!valveGatesConfig[idx]) return;
+            document.getElementById('selSVGActuationMode').value = 'custom';
+            valveGatesConfig[idx][field] = val;
+
+            const shotSize = parseFloat(document.getElementById('inpShotSize').value) || 62;
+            const vpSwitch = parseFloat(document.getElementById('inpVPSwitch').value) || 10;
+            const injTime = Math.max(0.4, calcProfile.totalInjTime);
+
+            if (field === 'openScrewPos') {
+                const frac = Math.max(0, Math.min(1, (shotSize - val) / Math.max(1, shotSize - vpSwitch)));
+                valveGatesConfig[idx].openTime = parseFloat((frac * injTime).toFixed(2));
+            } else if (field === 'openTime') {
+                const frac = Math.max(0, Math.min(1, val / injTime));
+                valveGatesConfig[idx].openScrewPos = parseFloat((shotSize - frac * (shotSize - vpSwitch)).toFixed(1));
+            }
+            renderSVGMatrixTable();
+            prepareDistanceFields();
+            executeMoldingSimulation(false);
+        }
+
+        function setupCascade3GatesPreset() {
+            if (!partMesh) return;
+            document.getElementById('selGateType').value = 'valve';
+            document.getElementById('selRunnerType').value = 'valve';
+            document.getElementById('selSVGActuationMode').value = 'cascade';
+            syncGateDimensionsToWallThickness();
+
+            resetGates();
+            const box = new THREE.Box3().setFromObject(partMesh);
+            const spanY = box.max.y - box.min.y;
+            const zFront = box.max.z;
+
+            // Place 3 Sequential Valve Gates along the length of the part
+            const p1 = new THREE.Vector3(0, box.max.y - spanY * 0.15, zFront);
+            const p2 = new THREE.Vector3(0, (box.max.y + box.min.y) * 0.5, zFront);
+            const p3 = new THREE.Vector3(0, box.min.y + spanY * 0.15, zFront);
+
+            addInjectionGate(p1, new THREE.Vector3(0, 0, 1), false);
+            addInjectionGate(p2, new THREE.Vector3(0, 0, 1), false);
+            addInjectionGate(p3, new THREE.Vector3(0, 0, 1), false);
+
+            syncValveGatesConfigArray();
+            autoCalcCascadeTimers(false);
+            prepareDistanceFields();
+            executeMoldingSimulation(true);
+            restartCAESimulation();
+            toggleCAEPlayPause();
+            showNotification("3x Sequential Valve Gate (Cascade) Aktif!", "fa-sitemap", "#00ff9d");
+        }
+
+        // =========================================================================
+        // 3. SCIENTIFIC MOLDING & VALVE GATE RHEOLOGY ENGINE
+        // =========================================================================
+        function applyResinProperties() {
+            const d = RESIN_DB[document.getElementById('selMaterial').value];
+            document.getElementById('txtResinMFI').innerText = `${d.mfi}g/${d.density}`;
+            document.getElementById('txtResinAlpha').innerText = d.alpha;
+            document.getElementById('txtResinShearLimit').innerText = d.shearLimit.toLocaleString();
+            document.getElementById('txtResinShrink').innerText = d.shrink;
+            document.getElementById('txtResinDrying').innerText = d.drying;
+            document.getElementById('badgeMorphology').innerText = d.morph;
+            document.getElementById('tempManifold').value = d.meltTemp + 5;
+            document.getElementById('tempNH').value = d.meltTemp;
+            document.getElementById('tempH1').value = d.meltTemp;
+            document.getElementById('tempH2').value = d.meltTemp - 10;
+            document.getElementById('tempH3').value = d.meltTemp - 20;
+            document.getElementById('tempH4').value = d.meltTemp - 35;
+            document.getElementById('tempMoldFix').value = d.moldTemp;
+            document.getElementById('tempMoldMov').value = d.moldTemp;
+            handleRealtimeParamChange();
+        }
+
+        function updateGateSpecText() {
+            const gType = document.getElementById('selGateType').value.toUpperCase();
+            const dimTxt = gateGeometry.type === 'edge'
+                ? `${gateGeometry.width}×${gateGeometry.thick}mm`
+                : `Ø${gateGeometry.dia}mm`;
+            document.getElementById('txtGateCount').innerText = `${gateObjects.length}x ${gType} (${dimTxt})`;
+        }
+
+        function executeMoldingSimulation(notify = true) {
+            const resin = RESIN_DB[document.getElementById('selMaterial').value];
+            const mach = MACHINE_DB[document.getElementById('selMachine').value];
+            const getNum = id => parseFloat(document.getElementById(id).value) || 0;
+            document.getElementById('txtScrewDiaBadge').innerText = `Screw Ø${mach.screwDia}mm`;
+
+            const projArea = getNum('inpProjArea'), cavities = Math.max(1, getNum('inpCavities'));
+            const wallThick = Math.max(0.4, getNum('inpWallThick')), flowLen = Math.max(10, getNum('inpFlowLength'));
+            const runnerType = document.getElementById('selRunnerType').value;
+            const runnerFactor = runnerType === 'cold' ? 1.18 : 1.0;
+
+            const vVals = [getNum('v_1'), getNum('v_2'), getNum('v_3'), getNum('v_4'), getNum('v_5')];
+            const pVals = [getNum('p_1'), getNum('p_2'), getNum('p_3'), getNum('p_4'), getNum('p_5')];
+            const xVals = [getNum('x_1'), getNum('x_2'), getNum('x_3'), getNum('x_4'), getNum('inpVPSwitch')];
+            const htVals = [getNum('ht_1'), getNum('ht_2'), getNum('ht_3')];
+            const hpVals = [getNum('hp_1'), getNum('hp_2'), getNum('hp_3')];
+
+            const coolTime = getNum('inpCoolTime'), dryCycle = getNum('inpDryCycle');
+            const shotSize = getNum('inpShotSize'), coolantFlow = getNum('inpCoolantFlow');
+
+            const singlePartWeightG = projArea * (wallThick / 10) * 0.62 * resin.solidDensity;
+            const totalShotWeightG = singlePartWeightG * cavities * runnerFactor;
+            const meltShotVolCm3 = totalShotWeightG / resin.density;
+            const screwAreaCm2 = (Math.PI * Math.pow(mach.screwDia / 10, 2)) / 4;
+            const reqTotalShotMm = parseFloat((((meltShotVolCm3 / screwAreaCm2) * 10) + 4.5).toFixed(1));
+            document.getElementById('txtReqShotHint').innerText = `Ideal Shot: ${reqTotalShotMm} mm`;
+
+            const maxBarrelVolCm3 = screwAreaCm2 * (mach.maxShotMm / 10);
+            const barrelUtilPct = (meltShotVolCm3 / maxBarrelVolCm3) * 100;
+
+            let estInjTime = 0, curStroke = shotSize;
+            for (let i = 0; i < 5; i++) {
+                estInjTime += Math.max(0, curStroke - xVals[i]) / Math.max(8, (vVals[i] / 100) * mach.maxInjVel);
+                curStroke = xVals[i];
+            }
+            if (estInjTime < 0.25) estInjTime = 0.65;
+
+            const totalHoldTime = htVals.reduce((a, b) => a + b, 0);
+            const totalCycle = estInjTime + totalHoldTime + coolTime + dryCycle;
+            const residenceTimeMin = (Math.max(1.2, (maxBarrelVolCm3 * 0.55) / Math.max(1, meltShotVolCm3)) * totalCycle) / 60;
+
+            const avgMoldTemp = (getNum('tempMoldFix') + getNum('tempMoldMov')) / 2;
+            const avgBarrelTemp = (getNum('tempNH') + getNum('tempH1') + getNum('tempH2')) / 3;
+            const tempRatio = Math.max(1.15, (avgBarrelTemp - avgMoldTemp) / Math.max(8, resin.ejectTemp - avgMoldTemp));
+            const minTheoCool = ((wallThick * wallThick) / (Math.PI * Math.PI * resin.alpha)) * Math.log((4 / Math.PI) * tempRatio);
+
+            const reynoldsNumber = Math.round(coolantFlow * 835);
+            document.getElementById('badgeReynolds').innerText = reynoldsNumber >= 4000 ? `Re: ${reynoldsNumber} (TURBULENT)` : `Re: ${reynoldsNumber} (LAMINAR)`;
+
+            // Calculate active simultaneous gates during peak fill for shear rate & delta P
+            const numGates = Math.max(1, gateObjects.length);
+            const isValveGate = gateGeometry.type === 'valve';
+            let activeGatesDuringFill = numGates;
+            if (isValveGate && valveGatesConfig.length > 1) {
+                // In sequential cascade, fewer gates are open simultaneously at the very beginning
+                const earlyOpenCount = valveGatesConfig.filter(vg => vg.openTime < estInjTime * 0.35 && vg.closeTime > vg.openTime).length;
+                activeGatesDuringFill = Math.max(1, earlyOpenCount);
+            }
+
+            const totalVolFlowMm3s = (screwAreaCm2 * 100) * (((vVals[1] + vVals[2] + vVals[3]) / 300) * mach.maxInjVel);
+            const flowPerGate = totalVolFlowMm3s / (activeGatesDuringFill * cavities);
+
+            // Shear rate calculation based on gate geometry (Rectangular WxH vs Circular Ø)
+            let gateShearRate = 0;
+            if (gateGeometry.type === 'edge') {
+                gateShearRate = (6 * flowPerGate) / (gateGeometry.width * Math.pow(gateGeometry.thick, 2));
+            } else {
+                gateShearRate = (4 * flowPerGate) / (Math.PI * Math.pow(gateGeometry.dia / 2, 3));
+            }
+
+            const gateVelocity = (flowPerGate / Math.max(0.2, gateGeometry.areaMm2)) / 1000;
+            const effectiveVisc = Math.round(resin.viscRef * Math.exp(-0.02 * (avgBarrelTemp - resin.meltTemp)) * Math.pow(Math.max(100, gateShearRate) / 1000, -0.42));
+            const gateDeltaP = Math.round(((8 * effectiveVisc * (gateVelocity * 1000) * gateGeometry.land) / Math.pow(gateGeometry.hydDia, 2)) * 0.0005);
+
+            // Thermal freeze vs Mechanical Valve Pin Close Time
+            const thermalGateFreeze = parseFloat(((Math.pow(gateGeometry.thick, 2) / (2 * Math.PI * Math.PI * resin.alpha)) * Math.log((4 / Math.PI) * tempRatio)).toFixed(1));
+            const maxVGClose = valveGatesConfig.length > 0 ? Math.max(...valveGatesConfig.map(v => v.closeTime)) : thermalGateFreeze;
+            const effectiveGateSeal = isValveGate ? parseFloat(Math.max(0.5, maxVGClose - estInjTime).toFixed(1)) : thermalGateFreeze;
+
+            // Effective L/t ratio is reduced by multiple active gates
+            const effectiveFlowLen = flowLen / Math.pow(numGates, 0.65);
+            const ltRatio = effectiveFlowLen / wallThick;
+            const maxPeakInjPressure = Math.max(...pVals);
+            const avgCavityPressure = Math.max(15, (maxPeakInjPressure - Math.min(55, gateDeltaP)) * 0.48);
+            const reqClampingTonnage = Math.round((projArea * cavities * (avgCavityPressure * 0.1) * 1.15) / 9.8);
+            const sinkMarkIndex = parseFloat(Math.max(0.2, resin.shrinkNum * (wallThick / 2) * (1.2 - Math.min(0.6, (hpVals[0] / 100)))).toFixed(2));
+
+            calcProfile = {
+                totalInjTime: estInjTime, holdTime: totalHoldTime, coolTime, minTheoCool, dryCycle,
+                totalCycleTime: totalCycle, clampRequired: reqClampingTonnage, maxPressure: maxPeakInjPressure,
+                gateShearRate, gateDeltaP, gateSealTime: effectiveGateSeal, partWeightG: singlePartWeightG,
+                shotWeightG: totalShotWeightG, reqShotStrokeMm: reqTotalShotMm, sinkMarkIndex
+            };
+
+            // Recompute 3D arrival time field with current estInjTime & Valve Gate timers
+            prepareDistanceFields();
+
+            // Diagnostics including Valve Gate Timer checks
+            const defects = [];
+            if (gateShearRate > resin.shearLimit) {
+                const rec = parseFloat((gateGeometry.dia + 0.4).toFixed(2));
+                defects.push({
+                    title: `Gate Shear Overlimit (${Math.round(gateShearRate).toLocaleString()} s⁻¹ > ${resin.shearLimit.toLocaleString()})`,
+                    desc: `Shear rate pada gate terlalu tinggi. Risiko Silver Streak & degradasi polimer.`,
+                    type: 'danger',
+                    fixLabel: `Perbesar Gate Ø${rec}mm`,
+                    fixAction: () => applyGatePresetSize(rec)
+                });
+            }
+
+            // Valve Gate specific mechanical warnings
+            if (valveGatesConfig.length > 0) {
+                const allOpenedTooLate = valveGatesConfig.every(v => v.openTime > 0.25);
+                if (allOpenedTooLate) {
+                    defects.push({
+                        title: `Valve Gate Dead-Head Pressure (Semua Gate T_open > 0.25s)`,
+                        desc: `Injeksi dimulai saat semua pin Valve Gate tertutup! Tekanan nozzle melonjak ekstrem.`,
+                        type: 'danger',
+                        fixLabel: `Set VG-1 Open 0.0s`,
+                        fixAction: () => { valveGatesConfig[0].openTime = 0.0; renderSVGMatrixTable(); executeMoldingSimulation(true); }
+                    });
+                }
+                const prematureCloseGate = valveGatesConfig.find(v => v.closeTime < estInjTime * 0.9);
+                if (prematureCloseGate || dynamicSimState.unfilledCount > dynamicSimState.vertexCount * 0.03) {
+                    defects.push({
+                        title: `Valve Gate Premature Close / Short Shot (${prematureCloseGate ? prematureCloseGate.id : 'SVG'})`,
+                        desc: `Pin menutup sebelum kavitas penuh (T_close < Fill Time ${estInjTime.toFixed(2)}s). Aliran terhenti!`,
+                        type: 'danger',
+                        fixLabel: `Auto-Fix SVG Timer`,
+                        fixAction: () => { autoCalcCascadeTimers(true); }
+                    });
+                }
+            }
+
+            if (!isValveGate && thermalGateFreeze > totalHoldTime + 0.4) {
+                const recH = parseFloat((thermalGateFreeze + 0.6).toFixed(1));
+                defects.push({
+                    title: `Premature Hold End (Seal ${thermalGateFreeze}s > Hold ${totalHoldTime.toFixed(1)}s)`,
+                    desc: `Gate belum beku saat holding selesai, memicu arus balik & Sink Mark.`,
+                    type: 'warning',
+                    fixLabel: `Hold ${recH}s`,
+                    fixAction: () => { document.getElementById('ht_1').value = (recH * 0.5).toFixed(1); document.getElementById('ht_2').value = (recH * 0.5).toFixed(1); executeMoldingSimulation(true); }
+                });
+            }
+            if (coolTime < minTheoCool) {
+                const recC = Math.ceil(minTheoCool);
+                defects.push({
+                    title: `Warpage Risk (Cool ${coolTime}s < Min ${minTheoCool.toFixed(1)}s)`,
+                    desc: `Suhu inti part (t=${wallThick}mm) belum mencapai suhu ejeksi aman.`,
+                    type: 'danger',
+                    fixLabel: `Cool ${recC}s`,
+                    fixAction: () => { document.getElementById('inpCoolTime').value = recC; executeMoldingSimulation(true); }
+                });
+            }
+            if (reqClampingTonnage > mach.ton) {
+                defects.push({
+                    title: `Mold Flashing (${reqClampingTonnage}T > ${mach.ton}T)`,
+                    desc: `Gaya kavitas melebihi tonase mesin.`,
+                    type: 'danger',
+                    fixLabel: `Upgrade Mesin`,
+                    fixAction: () => { document.getElementById('selMachine').value = Object.keys(MACHINE_DB).find(k => MACHINE_DB[k].ton >= reqClampingTonnage) || '1300'; executeMoldingSimulation(true); }
+                });
+            }
+
+            document.getElementById('resCycleTime').innerText = `${totalCycle.toFixed(1)} s`;
+            document.getElementById('resClampReq').innerText = `${reqClampingTonnage} T`;
+            document.getElementById('resGateDeltaP').innerText = `${gateDeltaP} MPa`;
+            document.getElementById('resGateFreeze').innerText = `${effectiveGateSeal} s`;
+            document.getElementById('headerMeltStatus').innerText = `${avgBarrelTemp.toFixed(0)}°C (${residenceTimeMin.toFixed(1)}m)`;
+            document.getElementById('headerClampStatus').innerText = `${reqClampingTonnage}T / ${mach.ton}T`;
+            document.getElementById('headerGateShear').innerText = `${Math.round(gateShearRate).toLocaleString()} s⁻¹`;
+            document.getElementById('headerShotWeight').innerText = `${totalShotWeightG.toFixed(1)}g (${barrelUtilPct.toFixed(0)}%)`;
+
+            document.getElementById('sciLtRatio').innerText = `${ltRatio.toFixed(1)} : 1`;
+            document.getElementById('sciBarrelUtil').innerText = `${barrelUtilPct.toFixed(1)} %`;
+            document.getElementById('sciResidenceTime').innerText = `${residenceTimeMin.toFixed(1)} min`;
+            document.getElementById('sciMinCool').innerText = `${minTheoCool.toFixed(1)} s`;
+            document.getElementById('sciEffVisc').innerText = `${effectiveVisc} Pa·s`;
+            document.getElementById('sciSinkIndex').innerText = `${sinkMarkIndex} %`;
+
+            const batchQty = Math.max(1, getNum('inpBatchQty')), partsPerHour = (3600 / totalCycle) * cavities;
+            const totalCostPerPart = (((totalShotWeightG / cavities) / 1000) * getNum('inpResinPrice')) + (getNum('inpMachineRate') / partsPerHour);
+            document.getElementById('mesHourlyOutput').innerText = `${Math.round(partsPerHour)} pcs/hr`;
+            document.getElementById('mesPartWt').innerText = `${singlePartWeightG.toFixed(1)} g`;
+            document.getElementById('mesTotalResinKg').innerText = `${((batchQty / cavities) * (totalShotWeightG / 1000)).toFixed(1)} kg`;
+            document.getElementById('mesLeadTime').innerText = `${(batchQty / partsPerHour).toFixed(1)} hrs`;
+            document.getElementById('mesCostPerPart').innerText = `$${totalCostPerPart.toFixed(3)}`;
+
+            renderDefectsList(defects);
+            refreshActiveTelemetryChart();
+            updateCAEVertexColors(dynamicSimState.tProgress);
+            updateDynamicCAELegendAndInspector();
+            if (notify) showNotification("Simulasi Scientific Molding & Valve Gate Diperbarui!", "fa-circle-check", "#00ff9d");
+        }
+
+        function renderDefectsList(defects) {
+            const c = document.getElementById('defectsList'), b = document.getElementById('badgeMoldingStatus');
+            c.innerHTML = '';
+            if (defects.length === 0) {
+                b.className = 'px-2 py-0.5 rounded text-[9.5px] font-mono-tech font-bold bg-emerald-950/70 border border-emerald-600 text-emerald-400';
+                b.innerText = 'ZERO-DEFECT WINDOW';
+                c.innerHTML = `<div class="p-2 rounded bg-emerald-950/20 border border-emerald-800/40 text-emerald-300 text-[11px]"><i class="fas fa-circle-check mr-2"></i>Parameter Injeksi, Ukuran Gate (t-Synced) & Timer Valve Gate Optimal.</div>`;
+            } else {
+                b.className = 'px-2 py-0.5 rounded text-[9.5px] font-mono-tech font-bold bg-rose-950/70 border border-rose-600 text-rose-400';
+                b.innerText = `${defects.length} WARNINGS`;
+                defects.forEach((d, i) => {
+                    const row = document.createElement('div');
+                    row.className = `p-2 rounded border ${d.type === 'danger' ? 'border-rose-800/60 bg-rose-950/25' : 'border-amber-800/60 bg-amber-950/25'} flex items-center justify-between gap-2`;
+                    row.innerHTML = `<div><span class="font-bold text-[11px] text-white block">${d.title}</span><span class="text-[9.5px] text-slate-400">${d.desc}</span></div><button id="fix_${i}" class="px-2 py-1 rounded bg-emerald-500 text-black font-mono-tech font-bold text-[9px] shrink-0"><i class="fas fa-wrench mr-1"></i>${d.fixLabel}</button>`;
+                    c.appendChild(row);
+                    document.getElementById(`fix_${i}`).onclick = d.fixAction;
+                });
+            }
+        }
+
+        function runSmartAutoTune() {
+            applyResinProperties();
+            document.getElementById('chkAutoGateWall').checked = true;
+            syncGateDimensionsToWallThickness();
+            if (gatePositionsWorld.length > 1) {
+                document.getElementById('selSVGActuationMode').value = 'cascade';
+                autoCalcCascadeTimers(false);
+            }
+            rebuildGateMeshes();
+            executeMoldingSimulation(false);
+            document.getElementById('inpShotSize').value = calcProfile.reqShotStrokeMm;
+            document.getElementById('inpCoolTime').value = Math.ceil(calcProfile.minTheoCool * 1.15);
+            const recH = Math.max(4.0, parseFloat((calcProfile.gateSealTime + 0.8).toFixed(1)));
+            document.getElementById('ht_1').value = (recH * 0.5).toFixed(1);
+            document.getElementById('ht_2').value = (recH * 0.4).toFixed(1);
+            if (calcProfile.clampRequired > MACHINE_DB[document.getElementById('selMachine').value].ton) {
+                document.getElementById('selMachine').value = Object.keys(MACHINE_DB).find(k => MACHINE_DB[k].ton >= calcProfile.clampRequired) || '850';
+            }
+            autoCalcCascadeTimers(false);
+            executeMoldingSimulation(true);
+            showNotification("AI Auto-Tune (Gate + SVG Cascade + V-P) Selesai!", "fa-wand-magic-sparkles", "#00ff9d");
+        }
+
+        // =========================================================================
+        // 4. TELEMETRY CHARTS (INCLUDING VALVE GATE TIMING CHART)
+        // =========================================================================
+        function initSyscomWaveformChart() {
+            const ctx = document.getElementById('syscomChart').getContext('2d');
+            syscomChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [
+                    { label: 'Speed (%)', data: [], borderColor: '#00ff9d', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+                    { label: 'Press (MPa)', data: [], borderColor: '#ffb703', borderWidth: 2, pointRadius: 0, tension: 0.2 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 9 } } } }, scales: { x: { ticks: { color: '#64748b', font: { size: 8 } } }, y: { ticks: { color: '#94a3b8', font: { size: 8 } } } } }
+            });
+        }
+
+        function switchChartMode(m) {
+            activeChartMode = m;
+            ['btnChartVP', 'btnChartSVG', 'btnChartVisc', 'btnChartSeal'].forEach(id => {
+                document.getElementById(id).className = 'px-2 py-0.5 rounded text-[9px] font-mono-tech font-bold text-slate-400';
+            });
+            const map = { vp: 'btnChartVP', svg: 'btnChartSVG', viscosity: 'btnChartVisc', gateseal: 'btnChartSeal' };
+            document.getElementById(map[m]).className = 'px-2 py-0.5 rounded text-[9px] font-mono-tech font-bold bg-emerald-500 text-black';
+            refreshActiveTelemetryChart();
+        }
+
+        function refreshActiveTelemetryChart() {
+            if (!syscomChartInstance) return;
+            const getNum = id => parseFloat(document.getElementById(id).value) || 0;
+            const resin = RESIN_DB[document.getElementById('selMaterial').value];
+
+            if (activeChartMode === 'vp') {
+                syscomChartInstance.data.labels = ['0.2s', '0.6s', '1.0s', '1.4s', '1.8s (VP)', '3.0s', '4.5s', '6.0s'];
+                syscomChartInstance.data.datasets = [
+                    { label: 'Screw Speed (%)', data: [getNum('v_1'), getNum('v_2'), getNum('v_3'), getNum('v_4'), getNum('v_5'), 6, 5, 4], borderColor: '#00ff9d', borderWidth: 2, pointRadius: 0, tension: 0.2 },
+                    { label: 'Pressure (MPa)', data: [getNum('p_1')*0.8, getNum('p_2')*0.9, getNum('p_3'), getNum('p_4'), getNum('p_5'), getNum('hp_1'), getNum('hp_2'), getNum('hp_3')], borderColor: '#ffb703', borderWidth: 2, pointRadius: 0, tension: 0.2 }
+                ];
+            } else if (activeChartMode === 'svg') {
+                // Step waveform showing Valve Gate Open (100%) vs Closed (0%) over time
+                const maxT = Math.max(4.0, calcProfile.totalInjTime + calcProfile.holdTime + 0.5);
+                const steps = 12;
+                const labels = [];
+                for (let s = 0; s <= steps; s++) labels.push(((s / steps) * maxT).toFixed(1) + 's');
+                const palette = ['#00ff9d', '#ffb703', '#00e5ff', '#f43f5e', '#a855f7'];
+                syscomChartInstance.data.labels = labels;
+                syscomChartInstance.data.datasets = valveGatesConfig.map((vg, idx) => ({
+                    label: `${vg.id} Lift (%)`,
+                    data: labels.map((_, s) => {
+                        const t = (s / steps) * maxT;
+                        return (t >= vg.openTime && t <= vg.closeTime) ? 100 - idx * 6 : 0;
+                    }),
+                    borderColor: palette[idx % palette.length],
+                    borderWidth: 2,
+                    stepped: true,
+                    pointRadius: 0
+                }));
+            } else if (activeChartMode === 'viscosity') {
+                const sr = [1000, 3000, 7000, 15000, 30000, 50000];
+                syscomChartInstance.data.labels = sr.map(s => (s/1000)+'k s⁻¹');
+                syscomChartInstance.data.datasets = [
+                    { label: 'Viscosity (Pa·s)', data: sr.map(s => Math.round(resin.viscRef * Math.pow(s/1000, -0.42))), borderColor: '#00ff9d', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Shear StressIdx', data: sr.map(s => Math.round(45 * Math.pow(s/1000, 0.35))), borderColor: '#ffb703', borderWidth: 2, pointRadius: 0 }
+                ];
+            } else {
+                const ts = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5];
+                syscomChartInstance.data.labels = ts.map(t => t+'s');
+                syscomChartInstance.data.datasets = [
+                    { label: 'Part Weight (g)', data: ts.map(t => parseFloat((calcProfile.partWeightG * (1 - 0.04 * Math.exp(-t))).toFixed(2))), borderColor: '#00ff9d', borderWidth: 2, pointRadius: 0 },
+                    { label: 'Cavity Press (MPa)', data: ts.map(t => Math.round(75 * Math.exp(-t / Math.max(0.5, calcProfile.gateSealTime)))), borderColor: '#00e5ff', borderWidth: 2, pointRadius: 0 }
+                ];
+            }
+            syscomChartInstance.update();
+        }
+
+        // =========================================================================
+        // 5. 3D MOLDFLOW VIEWER & WALL-PROPORTIONAL 3D GATE / VALVE PIN MESHES
+        // =========================================================================
+        function initThreeJSViewer() {
+            const container = document.getElementById('threeCanvasWrapper');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x04060a);
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 80, 140);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+            const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+            dir.position.set(60, 120, 60);
+            scene.add(dir);
+
+            const grid = new THREE.GridHelper(200, 30, 0x142036, 0x0b1220);
+            grid.position.y = -32;
+            scene.add(grid);
+
+            coolingPipesGroup = new THREE.Group();
+            for (let z = -30; z <= 30; z += 20) {
+                const g = new THREE.CylinderGeometry(2.5, 2.5, 90, 12);
+                g.rotateZ(Math.PI / 2);
+                const m = new THREE.MeshStandardMaterial({ color: z < 0 ? 0x00b4d8 : 0xff4d6d });
+                const p1 = new THREE.Mesh(g, m); p1.position.set(0, 16, z);
+                const p2 = new THREE.Mesh(g, m); p2.position.set(0, -16, z);
+                coolingPipesGroup.add(p1, p2);
+            }
+            coolingPipesGroup.visible = false;
+            scene.add(coolingPipesGroup);
+
+            const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+            renderer.domElement.addEventListener('dblclick', e => {
+                if (!partMesh) return;
+                const r = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+                mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const hits = raycaster.intersectObject(partMesh);
+                if (hits.length > 0) addInjectionGate(hits[0].point, hits[0].face.normal, true);
+            });
+
+            renderer.domElement.addEventListener('pointermove', e => {
+                const tt = document.getElementById('probeTooltip');
+                if (!isProbeActive || !partMesh || !dynamicSimState.arrivalTimes) { tt.classList.add('hidden'); return; }
+                const r = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+                mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const hits = raycaster.intersectObject(partMesh);
+                if (hits.length > 0) {
+                    const idx = hits[0].face.a;
+                    const arrTime = dynamicSimState.arrivalTimes[idx];
+                    const norm = Math.min(1, arrTime / Math.max(0.1, dynamicSimState.maxArrivalTime));
+                    const gOwner = dynamicSimState.gateOwners ? dynamicSimState.gateOwners[idx] : 0;
+                    const resin = RESIN_DB[document.getElementById('selMaterial').value];
+                    tt.classList.remove('hidden');
+                    tt.style.left = (e.clientX + 14) + 'px'; tt.style.top = (e.clientY + 14) + 'px';
+                    document.getElementById('probeNodeId').innerText = '#' + idx;
+                    document.getElementById('probeGateOwner').innerText = arrTime === Infinity ? 'UNFILLED (CLOSED)' : `VG-${gOwner + 1}`;
+                    document.getElementById('probeFillTime').innerText = arrTime === Infinity ? 'SHORT SHOT' : arrTime.toFixed(2) + ' s';
+                    document.getElementById('probeTemp').innerText = (resin.meltTemp - norm * 16).toFixed(1) + ' °C';
+                    document.getElementById('probePress').innerText = (calcProfile.maxPressure * 0.6 * (1 - norm * 0.7)).toFixed(1) + ' MPa';
+                    document.getElementById('probeShear').innerText = (0.42 * (1 - norm * 0.5)).toFixed(2) + ' MPa';
+                } else tt.classList.add('hidden');
+            });
+
+            window.addEventListener('resize', onThreeResize);
+            (function anim() { requestAnimationFrame(anim); controls.update(); renderer.render(scene, camera); updatePinScreenPositions(); })();
+        }
+
+        function onThreeResize() {
+            const c = document.getElementById('threeCanvasWrapper');
+            if (!c || !renderer) return;
+            camera.aspect = c.clientWidth / c.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(c.clientWidth, c.clientHeight);
+        }
+
+        function toggleCoolingPipes() {
+            isCoolingVisible = !isCoolingVisible;
+            coolingPipesGroup.visible = isCoolingVisible;
+            showNotification(isCoolingVisible ? "Saluran Cooling 3D Aktif" : "Saluran Cooling Disembunyikan", "fa-snowflake", "#00e5ff");
+        }
+
+        function toggleProbeMode() {
+            isProbeActive = !isProbeActive;
+            document.getElementById('btnProbeMode').classList.toggle('border-cyan-400', isProbeActive);
+            showNotification(isProbeActive ? "Mode Node Probe Aktif: Arahkan kursor ke Part 3D" : "Mode Probe Nonaktif", "fa-crosshairs", "#00e5ff");
+        }
+
+        function toggleMeshWireframe() { if (partMesh) partMesh.material.wireframe = !partMesh.material.wireframe; }
+
+        function loadPresetCAD(type) {
+            currentPresetName = type;
+            if (partMesh) { scene.remove(partMesh); partMesh.geometry.dispose(); partMesh = null; }
+            resetGates();
+            const wallT = Math.max(0.5, parseFloat(document.getElementById('inpWallThick').value) || 2.2);
+            let geo;
+            if (type === 'phone' || type === 'bracket') {
+                const s = new THREE.Shape(), w = type === 'phone' ? 42 : 55, h = 80;
+                s.moveTo(-w/2, -h/2); s.lineTo(w/2, -h/2); s.lineTo(w/2, h/2); s.lineTo(-w/2, h/2); s.closePath();
+                geo = new THREE.ExtrudeGeometry(s, { depth: wallT, bevelEnabled: true, bevelThickness: wallT * 0.25, bevelSize: wallT * 0.25, steps: 2 });
+            } else if (type === 'gear') {
+                geo = new THREE.TorusKnotGeometry(24, Math.max(3, wallT * 2.5), 90, 16);
+            } else if (type === 'medical') {
+                geo = new THREE.CylinderGeometry(14, 14, 75, 32, 24, true);
+            } else {
+                geo = new THREE.CylinderGeometry(26, 18, 55, 36, 20, true);
+            }
+            geo.center();
+            setupPartMesh(geo);
+            setCADView('fit');
+
+            const box = new THREE.Box3().setFromObject(partMesh);
+            if (type === 'bracket') {
+                // Auto-place 3 cascade valve gates on automotive bumper bracket
+                setupCascade3GatesPreset();
+            } else {
+                addInjectionGate(new THREE.Vector3(0, box.max.y * 0.78, box.max.z), new THREE.Vector3(0, 0, 1), true);
+            }
+        }
+
+        function updatePartMeshWallThicknessVisual(wallT) {
+            if (!partMesh) return;
+            if (currentPresetName === 'phone' || currentPresetName === 'bracket') {
+                // Scale Z thickness proportionally to input wall thickness (base 2.2mm)
+                const baseScale = partMesh.userData.baseScale || 1.0;
+                partMesh.scale.set(baseScale, baseScale, baseScale * (wallT / 2.2));
+            }
+        }
+
+        function handleCustomCADUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const ext = file.name.split('.').pop().toLowerCase(), reader = new FileReader();
+            reader.onload = ev => {
+                let geo = ext === 'stl' ? new THREE.STLLoader().parse(ev.target.result) : null;
+                if (ext === 'obj') new THREE.OBJLoader().parse(ev.target.result).traverse(c => { if (c.isMesh && !geo) geo = c.geometry; });
+                if (geo) {
+                    currentPresetName = 'custom';
+                    if (partMesh) scene.remove(partMesh);
+                    resetGates(); geo.computeVertexNormals(); geo.center(); setupPartMesh(geo); setCADView('fit');
+                    const b = new THREE.Box3().setFromObject(partMesh);
+                    addInjectionGate(new THREE.Vector3(0, b.max.y, 0), new THREE.Vector3(0, 1, 0), true);
+                }
+            };
+            if (ext === 'stl') reader.readAsArrayBuffer(file); else reader.readAsText(file);
+        }
+
+        function setupPartMesh(geo) {
+            const count = geo.attributes.position.count;
+            geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+            partMesh = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.25, metalness: 0.1, clearcoat: 0.6, side: THREE.DoubleSide }));
+            geo.computeBoundingBox();
+            const b = geo.boundingBox, maxD = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z);
+            const scaleFactor = maxD > 0 ? (80 / maxD) : 1.0;
+            partMesh.scale.setScalar(scaleFactor);
+            partMesh.userData.baseScale = scaleFactor;
+            scene.add(partMesh);
+        }
+
+        // Construct accurate, wall-thickness-proportional 3D Gate Assembly
+        function createGateMesh(type, gateIdx) {
+            const group = new THREE.Group();
+            const d = Math.max(0.5, gateGeometry.dia);
+            const w = Math.max(0.6, gateGeometry.width);
+            const h = Math.max(0.4, gateGeometry.thick);
+            const land = Math.max(0.6, gateGeometry.land);
+
+            if (type === 'valve') {
+                // 1. Gate Orifice Land Ring (proportional to d and land)
+                const orificeGeo = new THREE.CylinderGeometry(d * 0.55, d * 0.5, land, 20);
+                orificeGeo.translate(0, land * 0.5, 0);
+                const orificeMesh = new THREE.Mesh(orificeGeo, new THREE.MeshStandardMaterial({ color: 0xffb703, metalness: 0.6, roughness: 0.3 }));
+                group.add(orificeMesh);
+
+                // 2. Translucent Hot Runner Nozzle Body
+                const bodyHeight = 14;
+                const bodyGeo = new THREE.CylinderGeometry(d * 1.45, d * 0.75, bodyHeight, 20);
+                bodyGeo.translate(0, land + bodyHeight * 0.5, 0);
+                const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.38, roughness: 0.15, metalness: 0.1 });
+                const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+                group.add(bodyMesh);
+
+                // 3. Heater Coil Ring Indicator
+                const ringGeo = new THREE.TorusGeometry(d * 1.15, 0.28, 10, 24);
+                ringGeo.rotateX(Math.PI / 2);
+                ringGeo.translate(0, land + 4.5, 0);
+                const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({ color: 0xff5500, emissive: 0xaa2200 }));
+                group.add(ringMesh);
+
+                // 4. Internal Moving Valve Pin (Diameter = Orifice Ø, animates UP/DOWN)
+                const pinHeight = 17;
+                const pinGeo = new THREE.CylinderGeometry(d * 0.46, d * 0.44, pinHeight, 18);
+                pinGeo.translate(0, pinHeight * 0.5, 0);
+                const pinMat = new THREE.MeshStandardMaterial({ color: 0x00ff9d, emissive: 0x005533, metalness: 0.8, roughness: 0.2 });
+                const pinMesh = new THREE.Mesh(pinGeo, pinMat);
+                pinMesh.position.y = 3.2; // Default Open (lifted)
+                group.add(pinMesh);
+
+                // 5. Top Pneumatic/Hydraulic Actuator Cap
+                const capGeo = new THREE.CylinderGeometry(d * 1.8, d * 1.8, 2.5, 20);
+                capGeo.translate(0, land + bodyHeight + 1.25, 0);
+                const capMesh = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7 }));
+                group.add(capMesh);
+
+                group.userData = { isValve: true, pinMesh, ringMesh, gateIdx };
+            } else if (type === 'edge') {
+                // Edge / Fan Gate: True Width W, Thickness H, Land L + Runner Bar
+                const landGeo = new THREE.BoxGeometry(w, land * 1.5, h);
+                landGeo.translate(0, land * 0.75, 0);
+                const landMesh = new THREE.Mesh(landGeo, new THREE.MeshStandardMaterial({ color: 0x00ff9d, emissive: 0x003322 }));
+                group.add(landMesh);
+
+                const runnerGeo = new THREE.BoxGeometry(w * 1.15, 11, h * 1.6);
+                runnerGeo.translate(0, land * 1.5 + 5.5, 0);
+                const runnerMesh = new THREE.Mesh(runnerGeo, new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x002244 }));
+                group.add(runnerMesh);
+                group.userData = { isValve: false, gateIdx };
+            } else if (type === 'tunnel') {
+                // Submarine / Tunnel Gate angled at 35 deg with orifice = d
+                const subGroup = new THREE.Group();
+                const coneGeo = new THREE.CylinderGeometry(d * 1.35, d * 0.5, 14, 18);
+                coneGeo.translate(0, 7, 0);
+                const coneMesh = new THREE.Mesh(coneGeo, new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0x3b0764 }));
+                subGroup.add(coneMesh);
+                subGroup.rotation.z = THREE.MathUtils.degToRad(35);
+                group.add(subGroup);
+                group.userData = { isValve: false, gateIdx };
+            } else {
+                // Pin / Sprue Gate proportional to d and land
+                const landGeo = new THREE.CylinderGeometry(d * 0.6, d * 0.5, land * 1.5, 18);
+                landGeo.translate(0, land * 0.75, 0);
+                const sprueGeo = new THREE.CylinderGeometry(d * 1.25, d * 0.6, 13, 18);
+                sprueGeo.translate(0, land * 1.5 + 6.5, 0);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x003355 });
+                group.add(new THREE.Mesh(landGeo, mat), new THREE.Mesh(sprueGeo, mat));
+                group.userData = { isValve: false, gateIdx };
+            }
+            return group;
+        }
+
+        function addInjectionGate(pos, normal, recompute = true) {
+            const n = normal ? normal.clone().normalize() : new THREE.Vector3(0, 1, 0);
+            const gIdx = gateObjects.length;
+            const m = createGateMesh(document.getElementById('selGateType').value, gIdx);
+            m.position.copy(pos);
+            m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+            scene.add(m);
+            gateObjects.push(m);
+            gatePositionsWorld.push(pos.clone());
+            gateNormalsWorld.push(n);
+
+            syncValveGatesConfigArray();
+            updateGateSpecText();
+            if (recompute) {
+                prepareDistanceFields();
+                executeMoldingSimulation(false);
+            }
+        }
+
+        function rebuildGateMeshes() {
+            gateObjects.forEach(g => scene.remove(g));
+            gateObjects = [];
+            const t = document.getElementById('selGateType').value;
+            gatePositionsWorld.forEach((pos, i) => {
+                const m = createGateMesh(t, i);
+                m.position.copy(pos);
+                m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), gateNormalsWorld[i]);
+                scene.add(m);
+                gateObjects.push(m);
+            });
+            updateGateSpecText();
+            update3DValvePinAnimations(dynamicSimState.tProgress);
+        }
+
+        function resetGates() {
+            gateObjects.forEach(g => scene.remove(g));
+            gateObjects = []; gatePositionsWorld = []; gateNormalsWorld = [];
+            valveGatesConfig = [];
+            updateGateSpecText();
+            renderSVGMatrixTable();
+            clearPinsOverlay();
+        }
+
+        // Animate 3D Valve Pin UP (Open) and DOWN (Closed) + HUD Status Strip
+        function update3DValvePinAnimations(progressPct) {
+            const fillAndHoldTime = Math.max(1.0, calcProfile.totalInjTime + calcProfile.holdTime);
+            // Map 0-100% slider to the active filling & packing window
+            const currentSimSec = (progressPct / 100) * calcProfile.totalInjTime;
+            const hudStrip = document.getElementById('hudValveGatesStrip');
+            if (hudStrip) hudStrip.innerHTML = '';
+
+            gateObjects.forEach((grp, idx) => {
+                const vg = valveGatesConfig[idx] || { id: `VG-${idx+1}`, openTime: 0, closeTime: fillAndHoldTime };
+                const isOpen = progressPct >= 99.5
+                    ? (vg.openTime < calcProfile.totalInjTime && vg.closeTime >= vg.openTime)
+                    : (currentSimSec >= vg.openTime && currentSimSec <= vg.closeTime);
+                vg.isOpenNow = isOpen;
+
+                if (grp.userData && grp.userData.isValve && grp.userData.pinMesh) {
+                    const pin = grp.userData.pinMesh;
+                    if (isOpen) {
+                        pin.position.y = 3.4; // Retracted UP -> Melt flows
+                        pin.material.color.setHex(0x00ff9d);
+                        pin.material.emissive.setHex(0x005533);
+                    } else {
+                        pin.position.y = 0.0; // Seated DOWN -> Orifice mechanically closed
+                        pin.material.color.setHex(0xff3355);
+                        pin.material.emissive.setHex(0x550011);
+                    }
+                }
+
+                const badgeEl = document.getElementById(`vgStateBadge_${idx}`);
+                if (badgeEl) {
+                    badgeEl.innerText = isOpen ? 'OPEN' : (currentSimSec < vg.openTime ? 'WAIT' : 'CLOSED');
+                    badgeEl.className = isOpen
+                        ? 'px-1.5 py-0.5 rounded text-[8.5px] font-mono-tech font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'px-1.5 py-0.5 rounded text-[8.5px] font-mono-tech font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40';
+                }
+
+                if (hudStrip) {
+                    const pill = document.createElement('span');
+                    pill.className = `px-1.5 py-0.5 rounded font-bold ${isOpen ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950/60 text-rose-400 border border-rose-700/40'}`;
+                    pill.innerText = `${vg.id}: ${isOpen ? 'OPEN' : 'SHUT'} (${vg.openTime}s-${vg.closeTime}s)`;
+                    hudStrip.appendChild(pill);
+                }
+            });
+        }
+
+        // =========================================================================
+        // 6. SEQUENTIAL VALVE GATE ARRIVAL-TIME & WELD LINE ELIMINATION SOLVER
+        // =========================================================================
+        function prepareDistanceFields() {
+            if (!partMesh || gatePositionsWorld.length === 0) return;
+            syncValveGatesConfigArray();
+
+            const posAttr = partMesh.geometry.attributes.position, count = posAttr.count;
+            dynamicSimState.vertexCount = count;
+            dynamicSimState.arrivalTimes = new Float32Array(count);
+            dynamicSimState.gateOwners = new Uint8Array(count);
+            dynamicSimState.weldMask = new Uint8Array(count);
+
+            const localGates = gatePositionsWorld.map(gw => partMesh.worldToLocal(gw.clone()));
+
+            // Find max geometric distance from earliest gate to calibrate flow velocity v_flow
+            let maxGeomDist = 0.001;
+            for (let i = 0; i < count; i++) {
+                const vx = posAttr.getX(i), vy = posAttr.getY(i), vz = posAttr.getZ(i);
+                let minD = Infinity;
+                for (let g of localGates) {
+                    const d = Math.hypot(vx - g.x, vy - g.y, vz - g.z);
+                    if (d < minD) minD = d;
+                }
+                if (minD > maxGeomDist) maxGeomDist = minD;
+            }
+
+            const totalInjTime = Math.max(0.4, calcProfile.totalInjTime);
+            const vFlow = maxGeomDist / totalInjTime; // Local 3D units per second
+
+            let maxArr = 0.01, furthestIdx = 0;
+            let weldSum = new THREE.Vector3(), weldCount = 0, unfilled = 0;
+
+            for (let i = 0; i < count; i++) {
+                const vx = posAttr.getX(i), vy = posAttr.getY(i), vz = posAttr.getZ(i);
+                let bestTime = Infinity, secondTime = Infinity;
+                let bestGate = 0, secondGate = 0;
+
+                for (let k = 0; k < localGates.length; k++) {
+                    const g = localGates[k];
+                    const vg = valveGatesConfig[k] || { openTime: 0.0, closeTime: 99.0 };
+                    const d = Math.hypot(vx - g.x, vy - g.y, vz - g.z);
+                    const rawArrival = vg.openTime + (d / vFlow);
+
+                    // Mechanical Valve Gate Close Check:
+                    // If rawArrival > vg.closeTime, the valve pin closed before melt from gate k could reach vertex i!
+                    const effectiveArrival = (rawArrival <= vg.closeTime) ? rawArrival : Infinity;
+
+                    if (effectiveArrival < bestTime) {
+                        secondTime = bestTime; secondGate = bestGate;
+                        bestTime = effectiveArrival; bestGate = k;
+                    } else if (effectiveArrival < secondTime) {
+                        secondTime = effectiveArrival; secondGate = k;
+                    }
+                }
+
+                dynamicSimState.arrivalTimes[i] = bestTime;
+                dynamicSimState.gateOwners[i] = bestGate;
+
+                if (bestTime === Infinity) {
+                    unfilled++;
+                } else if (bestTime > maxArr) {
+                    maxArr = bestTime;
+                    furthestIdx = i;
+                }
+
+                // Weld Line vs Sequential Cascade Check:
+                // A weld line forms when two independent melt fronts collide simultaneously (|t1 - t2| < threshold).
+                // If Gate 2 opens sequentially AFTER Gate 1's melt front has already passed Gate 2,
+                // Gate 1's front sweeps smoothly across the boundary without a head-on collision!
+                if (localGates.length > 1 && bestTime !== Infinity && secondTime !== Infinity) {
+                    const vgBest = valveGatesConfig[bestGate] || { openTime: 0 };
+                    const vgSecond = valveGatesConfig[secondGate] || { openTime: 0 };
+                    const distBetweenGates = localGates[bestGate].distanceTo(localGates[secondGate]);
+                    const transitBetweenGates = distBetweenGates / vFlow;
+                    const openDelta = Math.abs(vgBest.openTime - vgSecond.openTime);
+
+                    // If gates open nearly simultaneously (openDelta < 0.72 * transitBetweenGates), fronts collide head-on
+                    const isCascadeSwept = openDelta >= transitBetweenGates * 0.72;
+                    if (!isCascadeSwept && Math.abs(bestTime - secondTime) < (totalInjTime * 0.045)) {
+                        dynamicSimState.weldMask[i] = 1;
+                        weldSum.add(new THREE.Vector3(vx, vy, vz));
+                        weldCount++;
+                    }
+                }
+            }
+
+            dynamicSimState.maxArrivalTime = Math.max(totalInjTime, maxArr);
+            dynamicSimState.unfilledCount = unfilled;
+            dynamicSimState.lastFillVertex = new THREE.Vector3(posAttr.getX(furthestIdx), posAttr.getY(furthestIdx), posAttr.getZ(furthestIdx));
+            dynamicSimState.weldLineCenter = weldCount > 0 ? weldSum.divideScalar(weldCount) : null;
+
+            // Update Weld Line status badge in SVG tab
+            const wlEl = document.getElementById('txtWeldLineElimination');
+            if (wlEl) {
+                if (localGates.length <= 1) {
+                    wlEl.innerText = 'SINGLE GATE (NO WELD)';
+                    wlEl.className = 'text-[10.5px] font-bold text-emerald-400';
+                } else if (weldCount === 0) {
+                    wlEl.innerText = 'ELIMINATED (CASCADE SVG)';
+                    wlEl.className = 'text-[10.5px] font-bold text-emerald-400';
+                } else {
+                    wlEl.innerText = `ACTIVE WELD LINE (${weldCount} nodes)`;
+                    wlEl.className = 'text-[10.5px] font-bold text-rose-400';
+                }
+            }
+        }
+
+        function updateCAEVertexColors(progress) {
+            if (!partMesh || !dynamicSimState.arrivalTimes) return;
+            const cols = partMesh.geometry.attributes.color;
+            const currentSimTime = dynamicSimState.maxArrivalTime * (progress / 100);
+            const zonePalette = [
+                { r: 0.0, g: 0.95, b: 0.62 }, // VG-1 Emerald
+                { r: 1.0, g: 0.72, b: 0.02 }, // VG-2 Amber
+                { r: 0.0, g: 0.82, b: 1.0 },  // VG-3 Cyan
+                { r: 0.75, g: 0.35, b: 1.0 }  // VG-4 Purple
+            ];
+
+            for (let i = 0; i < dynamicSimState.vertexCount; i++) {
+                const arrT = dynamicSimState.arrivalTimes[i];
+                if (arrT <= currentSimTime) {
+                    if (dynamicSimState.weldMask && dynamicSimState.weldMask[i] === 1 && progress >= 92) {
+                        cols.setXYZ(i, 1.0, 0.08, 0.28); // Weld line highlight
+                    } else if (caeResultMode === 'gatezone') {
+                        const owner = dynamicSimState.gateOwners[i] % zonePalette.length;
+                        const c = zonePalette[owner];
+                        cols.setXYZ(i, c.r, c.g, c.b);
+                    } else {
+                        const normT = Math.min(1, arrT / Math.max(0.1, dynamicSimState.maxArrivalTime));
+                        const rgb = getCAEColorRamp(normT, caeResultMode);
+                        cols.setXYZ(i, rgb.r, rgb.g, rgb.b);
+                    }
+                } else {
+                    cols.setXYZ(i, 0.08, 0.11, 0.18); // Unfilled cavity
+                }
+            }
+            cols.needsUpdate = true;
+            update3DValvePinAnimations(progress);
+        }
+
+        function getCAEColorRamp(t, mode) {
+            if (mode === 'temp') t = 1 - t * 0.7;
+            else if (mode === 'press' || mode === 'shear') t = 1 - t;
+            else if (mode === 'sink') t = 0.3 + (1 - t) * 0.6;
+            if (t < 0.25) return { r: 0, g: t * 4, b: 1 };
+            if (t < 0.5) return { r: 0, g: 1, b: 1 - (t - 0.25) * 4 };
+            if (t < 0.75) return { r: (t - 0.5) * 4, g: 1, b: 0 };
+            return { r: 1, g: 1 - (t - 0.75) * 4, b: 0 };
+        }
+
+        function setCAEResultMode(mode) {
+            caeResultMode = mode;
+            const map = { fill: 'btnModeFill', gatezone: 'btnModeGateZone', temp: 'btnModeTemp', press: 'btnModePress', shear: 'btnModeShear', sink: 'btnModeSink' };
+            Object.values(map).forEach(id => document.getElementById(id).className = 'px-2 py-1 rounded text-[9px] font-bold font-mono-tech text-slate-400');
+            document.getElementById(map[mode]).className = 'px-2 py-1 rounded text-[9px] font-bold font-mono-tech bg-emerald-500 text-black';
+            updateCAEVertexColors(dynamicSimState.tProgress);
+            updateDynamicCAELegendAndInspector();
+        }
+
+        function toggleCAEInspectorCard(forceState) {
+            isInspectorVisible = typeof forceState === 'boolean' ? forceState : !isInspectorVisible;
+            const card = document.getElementById('caeInspectorCard');
+            const btn = document.getElementById('btnToggleInspector');
+            if (card) card.classList.toggle('hidden', !isInspectorVisible);
+            if (btn) {
+                btn.className = isInspectorVisible
+                    ? 'px-2 py-1 rounded text-[9px] font-bold font-mono-tech bg-cyan-500 text-black'
+                    : 'px-2 py-1 rounded text-[9px] font-bold font-mono-tech bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+            }
+        }
+
+        // Updates both the Bottom-Right Spectrum Legend (with real units & 5 ticks) and the Floating Inspector Card
+        function updateDynamicCAELegendAndInspector() {
+            const doc = CAE_MODE_DOCS[caeResultMode] || CAE_MODE_DOCS.fill;
+            const resin = RESIN_DB[document.getElementById('selMaterial').value];
+            const getNum = id => parseFloat(document.getElementById(id).value) || 0;
+
+            const barrelTemp = (getNum('tempNH') + getNum('tempH1') + getNum('tempH2')) / 3;
+            const moldTemp = (getNum('tempMoldFix') + getNum('tempMoldMov')) / 2;
+            const wallT = Math.max(0.5, getNum('inpWallThick'));
+            const flowL = Math.max(10, getNum('inpFlowLength'));
+
+            const gradBar = document.getElementById('legendGradientBar');
+            const ticksRow = document.getElementById('legendTicksRow');
+            const discZones = document.getElementById('legendDiscreteZones');
+
+            document.getElementById('legendTitle').innerHTML = `<i class="fas fa-circle-question text-cyan-400"></i>${doc.code}`;
+            document.getElementById('legendLowLabel').innerText = doc.lowMeaning;
+            document.getElementById('legendHighLabel').innerText = doc.highMeaning;
+
+            let minVal = 0, maxVal = 1.8, unitStr = 's', decimals = 2;
+            let liveRangeText = '', liveTipText = '';
+
+            if (caeResultMode === 'fill') {
+                minVal = 0.0;
+                maxVal = Math.max(0.2, dynamicSimState.maxArrivalTime || calcProfile.totalInjTime);
+                unitStr = 's';
+                decimals = 2;
+                liveRangeText = `0.00 s ➔ ${maxVal.toFixed(2)} s`;
+                liveTipText = dynamicSimState.unfilledCount > 0
+                    ? `⚠️ Terdeteksi ${dynamicSimState.unfilledCount} node belum terisi (Short Shot) akibat Valve Gate menutup terlalu cepat!`
+                    : `✅ Aliran mencapai ujung kavitas dalam ${maxVal.toFixed(2)} detik. Pastikan jalur Venting berada di area Merah.`;
+            } else if (caeResultMode === 'gatezone') {
+                // Compute % node ownership per Valve Gate
+                const counts = new Array(Math.max(1, gateObjects.length)).fill(0);
+                let totalFilled = 0;
+                if (dynamicSimState.gateOwners && dynamicSimState.arrivalTimes) {
+                    for (let i = 0; i < dynamicSimState.vertexCount; i++) {
+                        if (dynamicSimState.arrivalTimes[i] !== Infinity) {
+                            const gIdx = dynamicSimState.gateOwners[i];
+                            if (counts[gIdx] !== undefined) counts[gIdx]++;
+                            totalFilled++;
+                        }
+                    }
+                }
+                gradBar.classList.add('hidden');
+                ticksRow.classList.add('hidden');
+                discZones.classList.remove('hidden');
+                discZones.classList.add('flex');
+                const badgeColors = ['bg-emerald-500 text-black', 'bg-amber-400 text-black', 'bg-cyan-400 text-black', 'bg-purple-400 text-black'];
+                discZones.innerHTML = counts.map((c, idx) => {
+                    const pct = totalFilled > 0 ? Math.round((c / totalFilled) * 100) : Math.round(100 / counts.length);
+                    return `<span class="px-1.5 py-0.5 rounded font-bold ${badgeColors[idx % badgeColors.length]}">VG-${idx+1}: ${pct}%</span>`;
+                }).join('');
+                document.getElementById('legendUnit').innerText = `${counts.length} ACTIVE GATES`;
+                liveRangeText = counts.map((c, idx) => `VG-${idx+1}: ${totalFilled > 0 ? Math.round((c / totalFilled) * 100) : 100}%`).join(' | ');
+                liveTipText = counts.length > 1
+                    ? `💡 Atur T_open di Tab 2 (VALVE GATE) untuk menyeimbangkan porsi aliran antar gate & menghilangkan garis sambungan.`
+                    : `ℹ️ Hanya 1 Gate aktif (100% beban aliran). Double-click model 3D atau klik "3-GATE SVG" untuk simulasi multi-gate.`;
+            } else if (caeResultMode === 'temp') {
+                // Melt temperature drop along flow length + shear heating near gate
+                const tempDrop = Math.min(35, Math.max(6, (flowL / wallT) * 0.16 * (1.8 / Math.max(0.5, calcProfile.totalInjTime))));
+                const shearBoost = Math.min(8, (calcProfile.gateShearRate / 25000) * 2.5);
+                minVal = Math.max(moldTemp + 15, barrelTemp - tempDrop);
+                maxVal = barrelTemp + shearBoost;
+                unitStr = '°C';
+                decimals = 0;
+                liveRangeText = `${minVal.toFixed(0)}°C (Biru) ➔ ${maxVal.toFixed(0)}°C (Merah)`;
+                liveTipText = (maxVal - minVal) > 20
+                    ? `⚠️ Selisih suhu ΔT = ${(maxVal - minVal).toFixed(0)}°C cukup besar. Naikkan kecepatan injeksi atau gunakan Sequential Valve Gate.`
+                    : `✅ Gradien suhu lelehan sangat stabil (ΔT = ${(maxVal - minVal).toFixed(0)}°C). Risiko Flow Mark & Cold Weld rendah.`;
+            } else if (caeResultMode === 'press') {
+                maxVal = Math.max(20, Math.round((calcProfile.maxPressure - Math.min(45, calcProfile.gateDeltaP)) * 0.72));
+                minVal = Math.max(4, Math.round(maxVal * 0.18));
+                unitStr = 'MPa';
+                decimals = 0;
+                liveRangeText = `${minVal} MPa (Ujung) ➔ ${maxVal} MPa (Gate)`;
+                liveTipText = calcProfile.clampRequired > MACHINE_DB[document.getElementById('selMachine').value].ton
+                    ? `⚠️ Zona Merah (${maxVal} MPa) melampaui tonase mesin! Risiko Flashing tinggi di sekitar Gate.`
+                    : `✅ Tekanan puncak kavitas ${maxVal} MPa aman di dalam batas tonase mesin (${calcProfile.clampRequired}T).`;
+            } else if (caeResultMode === 'shear') {
+                maxVal = parseFloat(Math.min(0.85, Math.max(0.12, (calcProfile.gateShearRate / resin.shearLimit) * 0.42)).toFixed(2));
+                minVal = parseFloat((maxVal * 0.18).toFixed(2));
+                unitStr = 'MPa';
+                decimals = 2;
+                liveRangeText = `${minVal.toFixed(2)} MPa ➔ ${maxVal.toFixed(2)} MPa`;
+                liveTipText = calcProfile.gateShearRate > resin.shearLimit
+                    ? `⚠️ Tegangan geser puncak (${maxVal} MPa) melewati batas aman ${resin.name}! Perbesar Ø Gate untuk mencegah Silver Streak.`
+                    : `✅ Tegangan geser dinding (${maxVal} MPa) di bawah batas degradasi polimer.`;
+            } else if (caeResultMode === 'sink') {
+                maxVal = parseFloat((calcProfile.sinkMarkIndex * 1.35).toFixed(2));
+                minVal = parseFloat((calcProfile.sinkMarkIndex * 0.45).toFixed(2));
+                unitStr = '%';
+                decimals = 2;
+                liveRangeText = `${minVal.toFixed(2)}% ➔ ${maxVal.toFixed(2)}% Shrink`;
+                liveTipText = maxVal > 2.0
+                    ? `⚠️ Indeks susut lokal (${maxVal}%) tinggi di area merah. Naikkan Holding Pressure (HP1) atau perpanjang T_close Valve Gate.`
+                    : `✅ Penyusutan volumetrik terkendali (${minVal}% - ${maxVal}%). Risiko Sink Mark & Warpage rendah.`;
+            }
+
+            if (caeResultMode !== 'gatezone') {
+                gradBar.classList.remove('hidden');
+                ticksRow.classList.remove('hidden');
+                discZones.classList.add('hidden');
+                discZones.classList.remove('flex');
+                document.getElementById('legendUnit').innerText = `${minVal.toFixed(decimals)} - ${maxVal.toFixed(decimals)} ${unitStr}`;
+                for (let t = 0; t <= 4; t++) {
+                    const v = minVal + (t / 4) * (maxVal - minVal);
+                    document.getElementById(`legTick${t}`).innerText = `${v.toFixed(decimals)}${t === 4 ? unitStr : ''}`;
+                }
+            }
+
+            // Populate Floating Live CAE Inspector Card
+            document.getElementById('inspBadgeNum').innerText = doc.num;
+            document.getElementById('inspModeTitle').innerText = doc.title;
+            document.getElementById('inspModeSummary').innerText = doc.shortDesc;
+            document.getElementById('inspLiveMetric').innerText = liveRangeText;
+            document.getElementById('inspEngineeringTip').innerText = liveTipText;
+
+            const colorContainer = document.getElementById('inspColorMeaning');
+            if (colorContainer) {
+                colorContainer.innerHTML = doc.colorBoxes.map(cb => `
+                    <div class="p-1.5 rounded bg-[#060a12] border border-[#142036] flex items-start gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-sm ${cb.color} shrink-0 mt-0.5"></span>
+                        <div>
+                            <span class="text-white font-bold block text-[8.5px]">${cb.label}</span>
+                            <span class="text-slate-400 text-[7.5px] leading-tight block">${cb.desc}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function toggleCAEGuideModal(show) {
+            const modal = document.getElementById('caeGuideModal');
+            if (!modal) return;
+            modal.classList.toggle('hidden', !show);
+            modal.classList.toggle('flex', show);
+            if (show) {
+                const container = document.getElementById('caeGuideModalContent');
+                container.innerHTML = `
+                    <div class="p-3.5 rounded-xl bg-gradient-to-r from-emerald-950/40 via-[#0d1627] to-cyan-950/40 border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs font-hmi font-bold text-emerald-400 uppercase mb-0.5"><i class="fas fa-swatchbook mr-1.5"></i>Cara Membaca Bar Spektrum Warna CAE (Biru ➔ Hijau ➔ Kuning ➔ Merah)</div>
+                            <p class="text-[11px] text-slate-300">Setiap mode analisis memetakan variabel fisik reologi ke dalam gradasi warna pelangi (*Rainbow Jet Spectrum*). Nilai pada pojok kanan atas bar (<span class="text-emerald-400 font-mono-tech font-bold">s, °C, MPa, %</span>) otomatis menyesuaikan parameter mesin JSW & timer Valve Gate Anda.</p>
+                        </div>
+                        <div class="w-full md:w-64 shrink-0 bg-[#070b14] p-2.5 rounded-xl border border-[#1c2d4a]">
+                            <div class="h-2.5 w-full rounded-full mb-1" style="background: linear-gradient(to right, #0011ff, #00d4ff, #00ff73, #fffb00, #ff0037);"></div>
+                            <div class="flex justify-between text-[8.5px] font-mono-tech font-bold">
+                                <span class="text-sky-400">MIN (Biru)</span>
+                                <span class="text-emerald-400">OPTIMAL (Hijau)</span>
+                                <span class="text-rose-400">MAX (Merah)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        ${Object.keys(CAE_MODE_DOCS).map(key => {
+                            const d = CAE_MODE_DOCS[key];
+                            const isCurrent = caeResultMode === key;
+                            return `
+                                <div onclick="setCAEResultMode('${key}'); toggleCAEGuideModal(false);" class="p-3.5 rounded-xl bg-[#080d18] hover:bg-[#0e1729] border ${isCurrent ? 'border-emerald-400 ring-1 ring-emerald-400/40' : 'border-[#18253d]'} cursor-pointer transition-all space-y-2">
+                                    <div class="flex items-center justify-between border-b border-[#152238] pb-1.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-5 h-5 rounded bg-emerald-500 text-black font-mono-tech font-bold text-[10px] flex items-center justify-center">${d.num}</span>
+                                            <span class="font-hmi font-bold text-xs text-white">${d.title}</span>
+                                        </div>
+                                        <span class="text-[9px] font-mono-tech px-2 py-0.5 rounded ${isCurrent ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'bg-[#121c2e] text-cyan-400'}">${isCurrent ? 'SEDANG AKTIF' : 'KLIK UNTUK AKTIFKAN'}</span>
+                                    </div>
+                                    <p class="text-[10.5px] text-slate-300">${d.shortDesc}</p>
+                                    <div class="grid grid-cols-2 gap-1.5 text-[9.5px] font-mono-tech">
+                                        ${d.colorBoxes.map(cb => `
+                                            <div class="p-1.5 rounded bg-[#050810] border border-[#142033] flex items-start gap-1.5">
+                                                <span class="w-2.5 h-2.5 rounded-sm ${cb.color} shrink-0 mt-0.5"></span>
+                                                <div><strong class="text-white block text-[9px]">${cb.label}</strong><span class="text-slate-400 text-[8px] leading-tight block">${cb.desc}</span></div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <div class="p-2 rounded bg-[#050810] border border-[#152238] space-y-1 text-[9.5px] font-mono-tech">
+                                        <div><span class="text-slate-500">Persamaan Fisik:</span> <span class="text-cyan-300">${d.formula}</span></div>
+                                        <div><span class="text-amber-400">Efek Valve Gate:</span> <span class="text-slate-300">${d.svgImpact}</span></div>
+                                        <div><span class="text-rose-400">Deteksi Cacat:</span> <span class="text-slate-300">${d.defectLink}</span></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function toggleCAEPlayPause() {
+            if (isSimulationRunning) {
+                isSimulationPaused = !isSimulationPaused;
+                document.getElementById('iconPlay').className = isSimulationPaused ? 'fas fa-play' : 'fas fa-pause';
+                if (!isSimulationPaused) { lastFrameTimestamp = performance.now(); runCycleLoop(); }
+            } else {
+                isSimulationRunning = true; isSimulationPaused = false; dynamicSimState.tProgress = 0;
+                lastFrameTimestamp = performance.now();
+                document.getElementById('iconPlay').className = 'fas fa-pause';
+                clearPinsOverlay(); runCycleLoop();
+            }
+        }
+
+        function restartCAESimulation() {
+            isSimulationRunning = false; isSimulationPaused = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            userScrubTimeline(0);
+            document.getElementById('iconPlay').className = 'fas fa-play';
+            clearPinsOverlay();
+        }
+
+        function runCycleLoop(now = performance.now()) {
+            if (!isSimulationRunning || isSimulationPaused) return;
+            const dt = (now - lastFrameTimestamp) / 1000; lastFrameTimestamp = now;
+            dynamicSimState.tProgress += (dt / Math.max(4, calcProfile.totalInjTime * 2.2)) * 100;
+            if (dynamicSimState.tProgress >= 100) { dynamicSimState.tProgress = 100; finishMoldingCycle(); }
+            userScrubTimeline(dynamicSimState.tProgress);
+            if (dynamicSimState.tProgress < 100) animationFrameId = requestAnimationFrame(runCycleLoop);
+        }
+
+        function userScrubTimeline(val) {
+            dynamicSimState.tProgress = val;
+            document.getElementById('simTimeline').value = val;
+            document.getElementById('txtTimelinePercent').innerText = val.toFixed(0) + '%';
+            updateCAEVertexColors(val);
+            const shotMm = parseFloat(document.getElementById('inpShotSize').value) || 62;
+            const vpMm = parseFloat(document.getElementById('inpVPSwitch').value) || 10;
+            const curScrewMm = shotMm - (val / 100) * (shotMm - vpMm);
+            document.getElementById('hudScrewBar').style.left = Math.max(10, 65 - val * 0.5) + '%';
+            document.getElementById('hudCheckRing').innerText = curScrewMm.toFixed(1) + ' mm';
+            document.getElementById('hudSimTime').innerText = ((val / 100) * dynamicSimState.maxArrivalTime).toFixed(2) + ' s';
+        }
+
+        function finishMoldingCycle() {
+            isSimulationRunning = false;
+            document.getElementById('iconPlay').className = 'fas fa-rotate-left';
+            clearPinsOverlay();
+            if (dynamicSimState.lastFillVertex && partMesh) {
+                addCAEPin(partMesh.localToWorld(dynamicSimState.lastFillVertex.clone()), "AIR TRAP / VENTS", `Titik akhir (${dynamicSimState.maxArrivalTime.toFixed(2)}s)`, "#00e5ff");
+            }
+            if (dynamicSimState.weldLineCenter && partMesh) {
+                addCAEPin(partMesh.localToWorld(dynamicSimState.weldLineCenter.clone()), "WELD LINE", "Pertemuan 2 aliran simultan", "#ff3366");
+            } else if (gatePositionsWorld.length > 1 && partMesh) {
+                addCAEPin(gatePositionsWorld[1].clone(), "CASCADE SVG OK", "Weld Line tereliminasi oleh delay VG", "#00ff9d");
+            }
+        }
+
+        function addCAEPin(posWorld, title, desc, color) {
+            const el = document.createElement('div');
+            el.className = 'cae-pin font-mono-tech'; el.style.color = color;
+            el.innerHTML = `<div class="bg-[#0b121f]/95 border border-[#1e2f4d] p-1.5 rounded shadow-xl text-white" style="border-top:2px solid ${color}"><div class="text-[8.5px] font-bold">${title}</div><div class="text-[7.5px] text-slate-300">${desc}</div></div><div class="cae-pin-dot"></div>`;
+            document.getElementById('pinsOverlay').appendChild(el);
+            defectPins.push({ element: el, pos3D: posWorld });
+        }
+
+        function updatePinScreenPositions() {
+            if (!defectPins.length || !renderer) return;
+            const hw = renderer.domElement.clientWidth / 2, hh = renderer.domElement.clientHeight / 2;
+            defectPins.forEach(pin => {
+                const p = pin.pos3D.clone().project(camera);
+                pin.element.style.left = ((p.x * hw) + hw) + 'px';
+                pin.element.style.top = (-(p.y * hh) + hh) + 'px';
+            });
+        }
+
+        function clearPinsOverlay() { document.getElementById('pinsOverlay').innerHTML = ''; defectPins = []; }
+
+        function setCADView(v) {
+            if (!partMesh) return;
+            const b = new THREE.Box3().setFromObject(partMesh), c = b.getCenter(new THREE.Vector3());
+            if (v === 'iso') camera.position.set(c.x + 85, c.y + 75, c.z + 95);
+            else if (v === 'top') camera.position.set(c.x, c.y + 130, c.z);
+            else camera.position.set(c.x, c.y + 45, c.z + 125);
+            controls.target.copy(c); controls.update();
+        }
+
+        function toggleSetupSheetModal(show) {
+            const m = document.getElementById('setupSheetModal');
+            m.classList.toggle('hidden', !show); m.classList.toggle('flex', show);
+            if (show) {
+                const vgRows = valveGatesConfig.map(v =>
+                    `<tr><td class="p-1 border border-[#1c2840] text-amber-400 font-bold">${v.id}</td><td class="p-1 border border-[#1c2840]">${v.openTime} s (${v.openScrewPos} mm)</td><td class="p-1 border border-[#1c2840]">${v.closeTime} s</td><td class="p-1 border border-[#1c2840]">Ø${gateGeometry.dia} / W${gateGeometry.width}×H${gateGeometry.thick} mm</td></tr>`
+                ).join('');
+                document.getElementById('setupSheetContent').innerHTML = `
+                    <div class="grid grid-cols-2 gap-3 p-3 rounded bg-[#080d16] border border-[#182338]">
+                        <div><span class="text-slate-500 block">Machine / Polymer:</span><span class="text-emerald-400 font-bold">JSW J${document.getElementById('selMachine').value}AD / ${document.getElementById('selMaterial').value}</span></div>
+                        <div><span class="text-slate-500 block">Cycle / Clamp Required:</span><span class="text-white font-bold">${calcProfile.totalCycleTime.toFixed(1)} s / ${calcProfile.clampRequired} Ton</span></div>
+                        <div><span class="text-slate-500 block">Wall Thickness (t) / Gate Spec:</span><span class="text-cyan-400 font-bold">t = ${document.getElementById('inpWallThick').value} mm &rarr; ${document.getElementById('badge3DGateDim').innerText} (${gateGeometry.areaMm2} mm²)</span></div>
+                        <div><span class="text-slate-500 block">Gate Seal / Shear Rate:</span><span class="text-amber-400 font-bold">${calcProfile.gateSealTime} s / ${Math.round(calcProfile.gateShearRate).toLocaleString()} s⁻¹</span></div>
+                    </div>
+                    <div class="p-3 rounded bg-[#080d16] border border-[#182338]">
+                        <div class="text-amber-400 font-bold mb-1.5 uppercase">Sequential Valve Gate (SVG) Timing Schedule</div>
+                        <table class="w-full text-center border-collapse">
+                            <thead><tr class="bg-[#0f1624] text-slate-400"><th class="p-1">Gate ID</th><th class="p-1">Open Delay (Screw Pos)</th><th class="p-1">Close Timer</th><th class="p-1">Gate Dimension (t-Synced)</th></tr></thead>
+                            <tbody>${vgRows}</tbody>
+                        </table>
+                    </div>`;
+            }
+        }
+
+        function downloadRecipeJSON() {
+            const payload = { calcProfile, gateGeometry, valveGatesConfig };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'MORIROKU_Molding_Setup.json'; a.click();
+        }
+    </script>
+</body>
+</html>
